@@ -165,5 +165,9 @@
       "release-it"
     ],
     "version": "0.56.0"
+  },
+  "dependencies": {
+    "eventemitter3": "^5.0.1",
+    "react-native-video": "^6.18.0"
   }
 }
