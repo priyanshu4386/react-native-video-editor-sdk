@@ -7,9 +7,7 @@ export type VideoEditorSDKProps = {
   editCrop?: boolean;
   editBGM?: boolean;
   editTextOverlay?: boolean;
-  editSubtitle?: boolean;
   editVoiceOver?: boolean;
-  editMutation?: boolean;
 
   onCloseEditor: (result: {
     success: boolean;
@@ -17,3 +15,8 @@ export type VideoEditorSDKProps = {
     error?: string;
   }) => void;
 };
+
+// Export all types
+export * from './segments';
+export * from './timeline';
+export * from './editor';
