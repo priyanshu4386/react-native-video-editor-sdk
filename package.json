@@ -84,8 +84,22 @@
     "typescript": "^5.9.2"
   },
   "peerDependencies": {
+    "@react-native-documents/picker": "*",
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react-native-create-thumbnail": "*",
+    "react-native-fast-image": "*",
+    "react-native-fs": "*",
+    "react-native-gesture-handler": "*",
+    "react-native-linear-gradient": "*",
+    "react-native-nitro-modules": "*",
+    "react-native-nitro-sound": "*",
+    "react-native-permissions": "*",
+    "react-native-reanimated": "*",
+    "react-native-safe-area-context": "*",
+    "react-native-size-matters": "*",
+    "react-native-video": "*",
+    "react-native-worklets": "*"
   },
   "workspaces": [
     "example"
@@ -167,7 +181,6 @@
     "version": "0.56.0"
   },
   "dependencies": {
-    "eventemitter3": "^5.0.1",
-    "react-native-video": "^6.18.0"
+    "eventemitter3": "^5.0.1"
   }
 }
