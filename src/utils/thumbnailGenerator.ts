@@ -47,19 +47,14 @@ export const generateThumbnails = async (
     // Normalize URI for platform compatibility
     const normalizedUri = normalizeVideoUri(videoUri);
 
-    console.log(
-      `Starting thumbnail generation for ${videoDuration.toFixed(2)}s video`,
-      Platform.OS === 'ios' ? `\n  Original URI: ${videoUri}\n  Normalized URI: ${normalizedUri}` : ''
-    );
-
     // Generate unique cache identifier
     const mediaUriHash =
       videoUri && typeof videoUri === 'string'
         ? videoUri
-            .split('/')
-            .pop()
-            ?.replace(/[^a-zA-Z0-9]/g, '_')
-            .substring(0, 20) || 'video'
+          .split('/')
+          .pop()
+          ?.replace(/[^a-zA-Z0-9]/g, '_')
+          .substring(0, 20) || 'video'
         : 'video';
 
     const startTimeMs =
@@ -74,14 +69,8 @@ export const generateThumbnails = async (
     );
 
     const thumbnailPixelWidth = totalTimelineWidth / numThumbs;
-    console.log(
-      `Generating ${numThumbs} thumbnails, each ${thumbnailPixelWidth.toFixed(
-        2
-      )}px wide`
-    );
 
     const allResults: ThumbnailData[] = [];
-    console.log('allResults', allResults);
 
     // Generate in chunks
     for (let i = 0; i < numThumbs; i += CHUNK_SIZE) {
@@ -163,7 +152,6 @@ export const generateThumbnails = async (
       }
     }
 
-    console.log(`Successfully generated ${allResults.length} thumbnails`);
     return allResults;
   } catch (error) {
     console.error('Thumbnail generation error:', error);
@@ -193,21 +181,14 @@ export const regenerateThumbnailsForTrim = async (
   // Normalize URI for platform compatibility
   const normalizedUri = normalizeVideoUri(videoUri);
 
-  console.log(
-    `Regenerating thumbnails from ${startTime.toFixed(
-      2
-    )}s for ${duration.toFixed(2)}s`,
-    Platform.OS === 'ios' ? `\n  Normalized URI: ${normalizedUri}` : ''
-  );
-
   try {
     const mediaUriHash =
       videoUri && typeof videoUri === 'string'
         ? videoUri
-            .split('/')
-            .pop()
-            ?.replace(/[^a-zA-Z0-9]/g, '_')
-            .substring(0, 20) || 'video'
+          .split('/')
+          .pop()
+          ?.replace(/[^a-zA-Z0-9]/g, '_')
+          .substring(0, 20) || 'video'
         : 'video';
 
     const newTimelineWidth = getTimelineWidth(duration);

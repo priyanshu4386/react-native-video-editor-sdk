@@ -224,8 +224,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   // Initialize editor
   const initEditor = useCallback(({ source }: InitParams) => {
-    console.log('🎬 Initializing editor with source:', source);
-    console.log('🎬 Source type:', typeof source);
     sourceRef.current = source;
 
     videoElementsRef.current = [
@@ -235,7 +233,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         muted: false,
       },
     ];
-    console.log('🎬 Initial videoElements:', videoElementsRef.current);
   }, []);
 
   const trimRef = useRef<{ start: number; end: number }>({
@@ -373,7 +370,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   const addTextSegment = useCallback(
     (segment: TextSegment) => {
-      console.log('📝 Adding text segment:', segment.id, segment.text);
       setTextSegmentsState((prev) => [...prev, segment]);
       const operation = {
         type: 'addTextOverlay',
@@ -390,7 +386,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         screenWidth: PREVIEW_WIDTH,
         screenHeight: PREVIEW_HEIGHT,
       };
-      console.log('📝 Text operation to add:', operation);
       // Direct push for multiple text overlays
       videoElementsRef.current.push(operation);
     },
@@ -563,7 +558,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   const addVoiceoverSegment = useCallback(
     (segment: VoiceoverSegment) => {
-      console.log('🎤 Adding voiceover segment:', segment.id);
       setVoiceoverSegmentsState((prev) => [...prev, segment]);
       const operation = {
         type: 'addVoiceOver',
@@ -571,8 +565,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         startTime: segment.start,
         endTime: segment.end,
       };
-      console.log('🎤 Voiceover operation to add:', operation);
-      // Direct push for multiple voiceovers
       videoElementsRef.current.push(operation);
     },
     []
@@ -614,9 +606,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   // Build native export JSON
   const buildExportConfig = useCallback(() => {
-    console.log('📦 Building export config...');
-    console.log('📦 Total operations in ref:', videoElementsRef.current.length);
-    console.log('📦 Operations:', JSON.stringify(videoElementsRef.current, null, 2));
 
     // Filter out invalid operations before passing to native
     const validElements = videoElementsRef.current.filter((element) => {
@@ -668,7 +657,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
       // Validate trim operations
       if (element.type === 'trim') {
         if (element.startTime === undefined || element.endTime === undefined) {
-          console.warn('Skipping trim: startTime or endTime is missing');
           return false;
         }
       }
@@ -676,8 +664,6 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
       return true;
     });
 
-    console.log('📦 Valid elements after filtering:', validElements.length);
-    console.log('📦 Final config:', JSON.stringify({ videoElements: validElements }, null, 2));
 
     return {
       videoElements: validElements,

@@ -27,7 +27,6 @@ export default function App() {
         const pickedFile = result[0];
         const videoUri = pickedFile.uri;
 
-        console.log('✅ selected video details:', pickedFile);
         setSelectedVideoUri(videoUri);
 
         // Immediately open editor with selected video
@@ -36,7 +35,6 @@ export default function App() {
     } catch (err: any) {
       // Check if user cancelled
       if (err?.message === 'User canceled document picker') {
-        console.log('User cancelled video picker');
       } else {
         Alert.alert('Error', 'Failed to pick video from device');
       }
@@ -46,7 +44,6 @@ export default function App() {
   // Function to open editor with a video
   const openEditorWithVideo = async (videoUri: string) => {
     try {
-      console.log('Opening editor with video:', videoUri);
       const result = await openVideoEditor({
         source: videoUri,
         editTrim: true,
@@ -56,14 +53,12 @@ export default function App() {
         editVoiceOver: true,
       });
 
-      console.log('Editor result:', result);
 
       // Check if editing was successful
       if (result.success && result.exportedUri) {
         // Store the exported video URI
         setExportedVideoUri(result.exportedUri);
 
-        console.log('✅ Exported video URI:', result.exportedUri);
 
         // Show success alert with the URI
         Alert.alert(
