@@ -5,9 +5,9 @@ export type EditorTool =
   | 'crop'
   | 'bgm'
   | 'text'
-  | 'subtitle'
   | 'voiceover'
-  | 'mutation';
+  | 'mutation'
+  | 'save';
 
 export type SelectedTool = EditorTool | null;
 
@@ -28,9 +28,7 @@ type EditorProviderProps = {
     editCrop: boolean;
     editBGM: boolean;
     editTextOverlay: boolean;
-    editSubtitle: boolean;
     editVoiceOver: boolean;
-    editMutation: boolean;
   };
 };
 
@@ -47,9 +45,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
       crop: enabledFeatures.editCrop,
       bgm: enabledFeatures.editBGM,
       text: enabledFeatures.editTextOverlay,
-      subtitle: enabledFeatures.editSubtitle,
       voiceover: enabledFeatures.editVoiceOver,
-      mutation: enabledFeatures.editMutation,
+      mutation: true,
+      save: true,
       null: false,
     }),
     [enabledFeatures]

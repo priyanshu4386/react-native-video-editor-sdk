@@ -1,5 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StatusBar } from 'react-native';
+// @ts-ignore - Peer dependency
+import { ScaledSheet } from 'react-native-size-matters';
+import { deviceUtils } from '../../utils/deviceUtils';
+// @ts-ignore - Peer dependency
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
   onCancel: () => void;
@@ -7,46 +12,90 @@ type Props = {
 };
 
 export const TopBar: React.FC<Props> = ({ onCancel, onExport }) => {
+  const { top } = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={onCancel}>
-        <Text style={styles.cancel}>Cancel</Text>
-      </TouchableOpacity>
+    <View
+      style={[
+        styles.header,
+        {
+          paddingTop: deviceUtils.isAndroid
+            ? (StatusBar.currentHeight || 20) + 10
+            : top,
+        },
+      ]}
+    >
+      <Pressable onPress={onCancel} style={styles.headerButton}>
+        <View style={styles.closeIconPlaceholder}>
+          <Text style={styles.closeIconText}>✕</Text>
+        </View>
+      </Pressable>
 
-      <Text style={styles.title}>Video Editor</Text>
+      <View style={styles.titleContainer}>
+        <Text style={styles.headerTitle}>Edit Video</Text>
+      </View>
 
-      <TouchableOpacity onPress={onExport}>
-        <Text style={styles.export}>Export</Text>
-      </TouchableOpacity>
+      <Pressable
+        onPress={onExport}
+        style={[styles.headerButton, styles.nextButton]}
+      >
+        <Text style={styles.nextButtonText}>Next</Text>
+      </Pressable>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    height: 52,
-    paddingHorizontal: 16,
+const styles = ScaledSheet.create({
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1c1c1e',
-    backgroundColor: '#000',
-    zIndex: 100,
-    elevation: 100,
+    alignItems: 'center',
+    paddingHorizontal: '16@ms',
+    paddingBottom: '16@ms',
+    backgroundColor: 'transparent',
   },
-  title: {
+  headerButton: {
+    padding: '8@ms',
+    borderRadius: '20@ms',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeIconPlaceholder: {
+    width: '32@ms',
+    height: '32@ms',
+    borderRadius: '16@ms',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeIconText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: '16@ms',
+    fontWeight: '300',
   },
-  cancel: {
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: '16@ms',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  export: {
-    color: '#00ff88',
-    fontSize: 14,
-    fontWeight: '600',
+  nextButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: '18@ms',
+    paddingVertical: '8@ms',
+    borderRadius: '20@ms',
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontSize: '14@ms',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

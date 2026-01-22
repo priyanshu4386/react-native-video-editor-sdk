@@ -72,6 +72,30 @@ repositories {
 def kotlin_version = getExtOrDefault("kotlinVersion")
 
 dependencies {
+  // React Native bridge
   implementation "com.facebook.react:react-android"
+
+  // Kotlin
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+
+  // ===============================
+  // Media3 (REQUIRED for your SDK)
+  // ===============================
+  implementation "androidx.media3:media3-common:1.8.0"
+  implementation "androidx.media3:media3-common-ktx:1.8.0"
+  implementation "androidx.media3:media3-exoplayer:1.8.0"
+  implementation "androidx.media3:media3-ui:1.8.0"
+  implementation "androidx.media3:media3-transformer:1.8.0"
+  implementation "androidx.media3:media3-effect:1.8.0"
+
+  // ===============================
+  // AndroidX helpers (USED in code)
+  // ===============================
+  implementation "androidx.appcompat:appcompat:1.7.1"
+
+  // ===============================
+  // Coroutines (YOU USE THESE)
+  // ===============================
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 }

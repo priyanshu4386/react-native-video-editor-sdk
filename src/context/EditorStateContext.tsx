@@ -4,7 +4,15 @@ import React, {
   useEffect,
   useRef,
   useState,
+  useCallback,
 } from 'react';
+import type {
+  AudioSegment,
+  TextSegment,
+  VoiceoverSegment,
+} from '../types/segments';
+import { PREVIEW_WIDTH, PREVIEW_HEIGHT } from '../constants/dimensions';
+import { PixelRatio, Platform } from 'react-native';
 
 type VideoElement = {
   type: string;
@@ -32,16 +40,6 @@ type VideoElement = {
   screenWidth?: number;
   screenHeight?: number;
 
-  subtitleJson?: Array<{
-    start: number;
-    end: number;
-    text: string;
-  }>;
-  subtitleSize?: number;
-  subtitlePosition?: string;
-  subtitleOverlayColor?: string;
-  subtitleColor?: string;
-
   voiceOverUri?: string;
 };
 
@@ -50,7 +48,7 @@ type InitParams = {
   features: Record<string, boolean>;
 };
 
-type CropRatio = '9:16' | '1:1' | '16:9';
+type CropRatio = 'original' | '9:16' | '1:1' | '16:9';
 
 type EditorStateContextValue = {
   initEditor: (params: InitParams) => void;
@@ -68,6 +66,51 @@ type EditorStateContextValue = {
   isScrubbing: boolean;
   startScrubbing: () => void;
   stopScrubbing: () => void;
+  setAudioTrim: (start: number, end: number) => void;
+  getAudioTrim: () => { start: number; end: number };
+  audioUri: string | null;
+  setAudioUri: (uri: string | null) => void;
+  videoNaturalSize: { width: number; height: number } | null;
+  setVideoNaturalSize: (size: { width: number; height: number } | null) => void;
+  isPlaying: boolean;
+  setIsPlaying: (playing: boolean) => void;
+  isTrimming: boolean;
+  setIsTrimming: (trimming: boolean) => void;
+  isDraggingHandle: boolean;
+  setIsDraggingHandle: (dragging: boolean) => void;
+  activeSegment: { type: string; id?: string } | null;
+  setActiveSegment: (segment: { type: string; id?: string } | null) => void;
+  thumbnails: Array<{ uri: string; width: number; status?: string }>;
+  setThumbnails: (
+    thumbnails: Array<{ uri: string; width: number; status?: string }>
+  ) => void;
+  isMuted: boolean;
+  setIsMuted: (muted: boolean) => void;
+  videoRef: React.RefObject<any> | null;
+  setVideoRef: (ref: React.RefObject<any> | null) => void;
+  audioSegments: AudioSegment[];
+  setAudioSegments: (segments: AudioSegment[]) => void;
+  addAudioSegment: (segment: AudioSegment) => void;
+  removeAudioSegment: (segmentId: string) => void;
+  textSegments: TextSegment[];
+  setTextSegments: (segments: TextSegment[]) => void;
+  addTextSegment: (segment: TextSegment) => void;
+  updateTextSegment: (segmentId: string, updates: Partial<TextSegment>) => void;
+  updateTextSegmentStart: (segmentId: string, start: number) => void;
+  updateTextSegmentEnd: (segmentId: string, end: number) => void;
+  removeTextSegment: (segmentId: string) => void;
+  isTextEditorVisible: boolean;
+  setIsTextEditorVisible: (visible: boolean) => void;
+  editingTextElement: TextSegment | null;
+  setEditingTextElement: (element: TextSegment | null) => void;
+  isTextDragging: boolean;
+  setIsTextDragging: (dragging: boolean) => void;
+  isTextPinching: boolean;
+  setIsTextPinching: (pinching: boolean) => void;
+  voiceoverSegments: VoiceoverSegment[];
+  setVoiceoverSegments: (segments: VoiceoverSegment[]) => void;
+  addVoiceoverSegment: (segment: VoiceoverSegment) => void;
+  removeVoiceoverSegment: (segmentId: string) => void;
 };
 
 const EditorStateContext = createContext<EditorStateContextValue | null>(null);
@@ -82,12 +125,95 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
   const videoElementsRef = useRef<VideoElement[]>([]);
   const sourceRef = useRef<string | null>(null);
 
-  const [cropRatio, setCropRatio] = useState<CropRatio>('9:16');
+  const getFontSizeForVideo = useCallback((fontSize: number): number => {
+    if (Platform.OS === 'android') {
+      return PixelRatio.get() * fontSize || 1;
+    }
+    return fontSize;
+  }, []);
+
+  const [cropRatio, setCropRatio] = useState<CropRatio>('original');
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [currentTime, setCurrentTimeState] = useState(0);
   const [duration, setDurationState] = useState(0);
+  const [videoNaturalSize, setVideoNaturalSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isTrimming, setIsTrimming] = useState(false);
+  const [isDraggingHandle, setIsDraggingHandle] = useState(false);
+  const [activeSegment, setActiveSegment] = useState<{
+    type: string;
+    id?: string;
+  } | null>(null);
+  const [thumbnails, setThumbnails] = useState<
+    Array<{ uri: string; width: number; status?: string }>
+  >([]);
+  const [isMuted, setIsMutedState] = useState(false);
+  const setIsMuted = useCallback((muted: boolean) => {
+    setIsMutedState(muted);
+    const videoUriElement = videoElementsRef.current.find(
+      (e) => e.type === 'videoUri'
+    );
+    if (videoUriElement) {
+      videoUriElement.muted = muted;
+    }
+  }, []);
+  const [videoRef, setVideoRefState] = useState<React.RefObject<any> | null>(
+    null
+  );
+  const [audioSegments, setAudioSegmentsState] = useState<AudioSegment[]>([]);
+  const [textSegments, setTextSegmentsState] = useState<TextSegment[]>([]);
+  const [voiceoverSegments, setVoiceoverSegmentsState] = useState<
+    VoiceoverSegment[]
+  >([]);
+  const [isTextEditorVisible, setIsTextEditorVisible] = useState(false);
+  const [editingTextElement, setEditingTextElement] =
+    useState<TextSegment | null>(null);
+  const [isTextDragging, setIsTextDragging] = useState(false);
+  const [isTextPinching, setIsTextPinching] = useState(false);
   const startScrubbing = () => setIsScrubbing(true);
   const stopScrubbing = () => setIsScrubbing(false);
+
+  const setVideoRef = (ref: React.RefObject<any> | null) => {
+    setVideoRefState(ref);
+  };
+
+  const [audioUri, setAudioUriState] = useState<string | null>(null);
+  const audioTrimRef = useRef<{ start: number; end: number }>({
+    start: 0,
+    end: 0,
+  });
+
+  // Add or replace operation - Moved up for stability
+  const upsertOperation = useCallback((element: VideoElement) => {
+    // Types that can have multiple instances
+    const multipleAllowedTypes = ['addTextOverlay', 'addVoiceOver'];
+
+    if (multipleAllowedTypes.includes(element.type)) {
+      // For text overlays and voiceovers, always push (no upsert logic)
+      videoElementsRef.current.push(element);
+    } else {
+      // For other types (trim, crop, bgm), use upsert logic
+      const index = videoElementsRef.current.findIndex(
+        (e) => e.type === element.type
+      );
+
+      if (index >= 0) {
+        videoElementsRef.current[index] = element;
+      } else {
+        videoElementsRef.current.push(element);
+      }
+    }
+  }, []);
+
+  // Remove operation - Moved up for stability
+  const removeOperation = useCallback((type: string) => {
+    videoElementsRef.current = videoElementsRef.current.filter(
+      (e) => e.type !== type
+    );
+  }, []);
 
   useEffect(() => {
     upsertOperation({
@@ -97,93 +223,473 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
   }, [cropRatio]);
 
   // Initialize editor
-  const initEditor = ({ source, features }: InitParams) => {
+  const initEditor = useCallback(({ source }: InitParams) => {
+    console.log('🎬 Initializing editor with source:', source);
+    console.log('🎬 Source type:', typeof source);
     sourceRef.current = source;
 
     videoElementsRef.current = [
       {
         type: 'videoUri',
         uri: source,
-        muted: features.editMutation ?? false,
+        muted: false,
       },
     ];
-  };
+    console.log('🎬 Initial videoElements:', videoElementsRef.current);
+  }, []);
 
   const trimRef = useRef<{ start: number; end: number }>({
     start: 0,
     end: 1,
   });
 
-  const setTrim = (start: number, end: number) => {
-    trimRef.current = { start, end };
+  const setTrim = useCallback(
+    (start: number, end: number) => {
+      trimRef.current = { start, end };
 
-    upsertOperation({
-      type: 'trim',
-      startTime: start,
-      endTime: end,
-    });
-  };
+      upsertOperation({
+        type: 'trim',
+        startTime: start,
+        endTime: end,
+      });
+    },
+    [upsertOperation]
+  );
 
-  const getTrim = () => trimRef.current;
+  const getTrim = useCallback(() => trimRef.current, []);
 
-  const setCurrentTime = (time: number) => {
+  const setCurrentTime = useCallback((time: number) => {
     setCurrentTimeState(time);
-  };
+  }, []);
 
-  const setDuration = (durationValue: number) => {
+  const setDuration = useCallback((durationValue: number) => {
     setDurationState(durationValue);
-  };
+  }, []);
 
-  const getPlaybackState = () => ({
-    currentTime,
-    duration,
-  });
+  const getPlaybackState = useCallback(
+    () => ({
+      currentTime,
+      duration,
+    }),
+    [currentTime, duration]
+  );
 
-  // const getMaskFromRatio = (ratio: CropRatio) => {
-  //   switch (ratio) {
-  //     case '9:16':
-  //       return null;
-  //     case '1:1':
-  //       return { top: 0.125, bottom: 0.125, left: 0, right: 0 };
-  //     case '16:9':
-  //       return { top: 0.35, bottom: 0.35, left: 0, right: 0 };
-  //   }
-  // };
+  const setAudioTrim = useCallback(
+    (start: number, end: number) => {
+      audioTrimRef.current = { start, end };
+      upsertOperation({
+        type: 'audio',
+        musicUri: audioUri || undefined,
+        audioOffset: start,
+      });
+    },
+    [upsertOperation, audioUri]
+  );
 
-  // Add or replace operation
-  const upsertOperation = (element: VideoElement) => {
-    const index = videoElementsRef.current.findIndex(
-      (e) => e.type === element.type
-    );
+  const getAudioTrim = useCallback(() => audioTrimRef.current, []);
 
-    if (index >= 0) {
-      videoElementsRef.current[index] = element;
-    } else {
-      videoElementsRef.current.push(element);
-    }
-  };
+  const setAudioUri = useCallback((uri: string | null) => {
+    setAudioUriState(uri);
+  }, []);
 
-  // Remove operation
-  const removeOperation = (type: string) => {
-    videoElementsRef.current = videoElementsRef.current.filter(
-      (e) => e.type !== type
-    );
-  };
+  const setAudioSegments = useCallback((segments: AudioSegment[]) => {
+    setAudioSegmentsState(segments);
+  }, []);
+
+  const addAudioSegment = useCallback(
+    (segment: AudioSegment) => {
+      setAudioSegmentsState([segment]);
+      upsertOperation({
+        type: 'audio',
+        musicUri: segment.uri,
+        audioOffset: segment.audioOffset,
+        isLooped: segment.isLooped,
+      });
+    },
+    [upsertOperation]
+  );
+
+  const removeAudioSegment = useCallback(
+    (segmentId: string) => {
+      setAudioSegmentsState((prev) => {
+        const newSegments = prev.filter((seg) => seg.id !== segmentId);
+        if (newSegments.length === 0) {
+          removeOperation('audio');
+          setAudioUriState(null); // Clear audioUri state when no segments remain
+        } else {
+          // Update the operation with the remaining segment
+          const remainingSegment = newSegments[0];
+          if (remainingSegment && remainingSegment.uri) {
+            upsertOperation({
+              type: 'audio',
+              musicUri: remainingSegment.uri,
+              audioOffset: remainingSegment.audioOffset,
+              isLooped: remainingSegment.isLooped,
+            });
+          }
+        }
+        return newSegments;
+      });
+
+      // Clear active segment if it's the one being deleted
+      setActiveSegment((prev) => {
+        if (prev?.type === 'audio' && prev?.id === segmentId) {
+          return null;
+        }
+        return prev;
+      });
+    },
+    [removeOperation, upsertOperation]
+  );
+
+  const setTextSegments = useCallback(
+    (segments: TextSegment[]) => {
+      setTextSegmentsState(segments);
+      // Remove all existing text overlay operations
+      videoElementsRef.current = videoElementsRef.current.filter(
+        (e) => e.type !== 'addTextOverlay'
+      );
+      // Add new text overlay operations
+      segments.forEach((segment) => {
+        videoElementsRef.current.push({
+          type: 'addTextOverlay',
+          text: segment.text,
+          fontSize: getFontSizeForVideo(segment.fontSize),
+          textColor: segment.color,
+          textOverlayColor: segment.backgroundColor,
+          textPosition: {
+            xAxis: segment?.x ?? 0,
+            yAxis: segment?.y ?? 0,
+          },
+          startTime: segment.start,
+          endTime: segment.end,
+          screenWidth: PREVIEW_WIDTH,
+          screenHeight: PREVIEW_HEIGHT,
+        });
+      });
+    },
+    [getFontSizeForVideo]
+  );
+
+  const addTextSegment = useCallback(
+    (segment: TextSegment) => {
+      console.log('📝 Adding text segment:', segment.id, segment.text);
+      setTextSegmentsState((prev) => [...prev, segment]);
+      const operation = {
+        type: 'addTextOverlay',
+        text: segment.text,
+        fontSize: getFontSizeForVideo(segment.fontSize),
+        textColor: segment.color,
+        textOverlayColor: segment.backgroundColor,
+        textPosition: {
+          xAxis: segment?.x ?? 0,
+          yAxis: segment?.y ?? 0,
+        },
+        startTime: segment.start,
+        endTime: segment.end,
+        screenWidth: PREVIEW_WIDTH,
+        screenHeight: PREVIEW_HEIGHT,
+      };
+      console.log('📝 Text operation to add:', operation);
+      // Direct push for multiple text overlays
+      videoElementsRef.current.push(operation);
+    },
+    [getFontSizeForVideo]
+  );
+
+  const updateTextSegment = useCallback(
+    (segmentId: string, updates: Partial<TextSegment>) => {
+      setTextSegmentsState((prev) => {
+        const updated = prev.map((seg) =>
+          seg.id === segmentId ? { ...seg, ...updates } : seg
+        );
+        // Remove all existing text overlay operations
+        videoElementsRef.current = videoElementsRef.current.filter(
+          (e) => e.type !== 'addTextOverlay'
+        );
+        // Rebuild all text overlay operations from state
+        updated.forEach((segment) => {
+          videoElementsRef.current.push({
+            type: 'addTextOverlay',
+            text: segment.text,
+            fontSize: getFontSizeForVideo(segment.fontSize),
+            textColor: segment.color,
+            textOverlayColor: segment.backgroundColor,
+            textPosition: {
+              xAxis: segment?.x ?? 0,
+              yAxis: segment?.y ?? 0,
+            },
+            startTime: segment.start,
+            endTime: segment.end,
+            screenWidth: PREVIEW_WIDTH,
+            screenHeight: PREVIEW_HEIGHT,
+          });
+        });
+        return updated;
+      });
+    },
+    [getFontSizeForVideo]
+  );
+
+  const updateTextSegmentStart = useCallback(
+    (segmentId: string, start: number) => {
+      setTextSegmentsState((prev) => {
+        const updated = prev.map((seg) =>
+          seg.id === segmentId ? { ...seg, start } : seg
+        );
+        // Remove all existing text overlay operations
+        videoElementsRef.current = videoElementsRef.current.filter(
+          (e) => e.type !== 'addTextOverlay'
+        );
+        // Rebuild all text overlay operations from state
+        updated.forEach((segment) => {
+          videoElementsRef.current.push({
+            type: 'addTextOverlay',
+            text: segment.text,
+            fontSize: getFontSizeForVideo(segment.fontSize),
+            textColor: segment.color,
+            textOverlayColor: segment.backgroundColor,
+            textPosition: {
+              xAxis: segment?.x ?? 0,
+              yAxis: segment?.y ?? 0,
+            },
+            startTime: segment.start,
+            endTime: segment.end,
+            screenWidth: PREVIEW_WIDTH,
+            screenHeight: PREVIEW_HEIGHT,
+          });
+        });
+        return updated;
+      });
+    },
+    [getFontSizeForVideo]
+  );
+
+  const updateTextSegmentEnd = useCallback(
+    (segmentId: string, end: number) => {
+      setTextSegmentsState((prev) => {
+        const updated = prev.map((seg) =>
+          seg.id === segmentId ? { ...seg, end } : seg
+        );
+        // Remove all existing text overlay operations
+        videoElementsRef.current = videoElementsRef.current.filter(
+          (e) => e.type !== 'addTextOverlay'
+        );
+        // Rebuild all text overlay operations from state
+        updated.forEach((segment) => {
+          videoElementsRef.current.push({
+            type: 'addTextOverlay',
+            text: segment.text,
+            fontSize: getFontSizeForVideo(segment.fontSize),
+            textColor: segment.color,
+            textOverlayColor: segment.backgroundColor,
+            textPosition: {
+              xAxis: segment?.x ?? 0,
+              yAxis: segment?.y ?? 0,
+            },
+            startTime: segment.start,
+            endTime: segment.end,
+            screenWidth: PREVIEW_WIDTH,
+            screenHeight: PREVIEW_HEIGHT,
+          });
+        });
+        return updated;
+      });
+    },
+    [getFontSizeForVideo]
+  );
+
+  const removeTextSegment = useCallback(
+    (segmentId: string) => {
+      setTextSegmentsState((prev) => {
+        const newSegments = prev.filter((seg) => seg.id !== segmentId);
+        // Remove all existing text overlay operations
+        videoElementsRef.current = videoElementsRef.current.filter(
+          (e) => e.type !== 'addTextOverlay'
+        );
+        // Rebuild text overlay operations with remaining segments
+        newSegments.forEach((segment) => {
+          // Validate before adding operation
+          if (segment.text && segment.text.trim() !== '') {
+            videoElementsRef.current.push({
+              type: 'addTextOverlay',
+              text: segment.text,
+              fontSize: getFontSizeForVideo(segment.fontSize),
+              textColor: segment.color,
+              textOverlayColor: segment.backgroundColor,
+              textPosition: {
+                xAxis: segment?.x ?? 0,
+                yAxis: segment?.y ?? 0,
+              },
+              startTime: segment.start,
+              endTime: segment.end,
+              screenWidth: PREVIEW_WIDTH,
+              screenHeight: PREVIEW_HEIGHT,
+            });
+          }
+        });
+        return newSegments;
+      });
+      // Clear active segment if it's the one being deleted
+      setActiveSegment((prev) => {
+        if (prev?.type === 'text' && prev?.id === segmentId) {
+          return null;
+        }
+        return prev;
+      });
+    },
+    [upsertOperation, getFontSizeForVideo]
+  );
+
+  const setVoiceoverSegments = useCallback(
+    (segments: VoiceoverSegment[]) => {
+      setVoiceoverSegmentsState(segments);
+      // Remove all existing voiceover operations
+      videoElementsRef.current = videoElementsRef.current.filter(
+        (e) => e.type !== 'addVoiceOver'
+      );
+      // Add new voiceover operations
+      segments.forEach((segment) => {
+        upsertOperation({
+          type: 'addVoiceOver',
+          voiceOverUri: segment.uri,
+          startTime: segment.start,
+          endTime: segment.end,
+        });
+      });
+    },
+    [upsertOperation]
+  );
+
+  const addVoiceoverSegment = useCallback(
+    (segment: VoiceoverSegment) => {
+      console.log('🎤 Adding voiceover segment:', segment.id);
+      setVoiceoverSegmentsState((prev) => [...prev, segment]);
+      const operation = {
+        type: 'addVoiceOver',
+        voiceOverUri: segment.uri,
+        startTime: segment.start,
+        endTime: segment.end,
+      };
+      console.log('🎤 Voiceover operation to add:', operation);
+      // Direct push for multiple voiceovers
+      videoElementsRef.current.push(operation);
+    },
+    []
+  );
+
+  const removeVoiceoverSegment = useCallback(
+    (segmentId: string) => {
+      setVoiceoverSegmentsState((prev) => {
+        const newSegments = prev.filter((seg) => seg.id !== segmentId);
+        // Remove all existing voiceover operations
+        videoElementsRef.current = videoElementsRef.current.filter(
+          (e) => e.type !== 'addVoiceOver'
+        );
+        // Rebuild voiceover operations with remaining segments
+        newSegments.forEach((segment) => {
+          // Validate before adding operation
+          if (segment.uri && segment.uri.trim() !== '') {
+            videoElementsRef.current.push({
+              type: 'addVoiceOver',
+              voiceOverUri: segment.uri,
+              startTime: segment.start,
+              endTime: segment.end,
+            });
+          }
+        });
+        return newSegments;
+      });
+
+      // Clear active segment if it's the one being deleted
+      setActiveSegment((prev) => {
+        if (prev?.type === 'voiceover' && prev?.id === segmentId) {
+          return null;
+        }
+        return prev;
+      });
+    },
+    []
+  );
 
   // Build native export JSON
-  const buildExportConfig = () => {
+  const buildExportConfig = useCallback(() => {
+    console.log('📦 Building export config...');
+    console.log('📦 Total operations in ref:', videoElementsRef.current.length);
+    console.log('📦 Operations:', JSON.stringify(videoElementsRef.current, null, 2));
+
+    // Filter out invalid operations before passing to native
+    const validElements = videoElementsRef.current.filter((element) => {
+      // Validate audio operations
+      if (element.type === 'audio') {
+        if (!element.musicUri || element.musicUri.trim() === '') {
+          console.warn('Skipping audio operation: musicUri is null or empty');
+          return false;
+        }
+      }
+
+      // Validate text overlay operations
+      if (element.type === 'addTextOverlay') {
+        if (!element.text || element.text.trim() === '') {
+          console.warn('Skipping text overlay: text is empty');
+          return false;
+        }
+        if (!element.textPosition) {
+          console.warn('Skipping text overlay: textPosition is missing');
+          return false;
+        }
+        if (element.startTime === undefined || element.endTime === undefined) {
+          console.warn(
+            'Skipping text overlay: startTime or endTime is missing'
+          );
+          return false;
+        }
+      }
+
+      // Validate voiceover operations
+      if (element.type === 'addVoiceOver') {
+        if (!element.voiceOverUri || element.voiceOverUri.trim() === '') {
+          console.warn('Skipping voiceover: voiceOverUri is null or empty');
+          return false;
+        }
+      }
+
+      // Validate crop operations
+      if (element.type === 'crop') {
+        if (
+          element.selection_params === 'original' ||
+          !element.selection_params
+        ) {
+          console.warn('Skipping crop: original ratio selected or empty');
+          return false;
+        }
+      }
+
+      // Validate trim operations
+      if (element.type === 'trim') {
+        if (element.startTime === undefined || element.endTime === undefined) {
+          console.warn('Skipping trim: startTime or endTime is missing');
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    console.log('📦 Valid elements after filtering:', validElements.length);
+    console.log('📦 Final config:', JSON.stringify({ videoElements: validElements }, null, 2));
+
     return {
-      videoElements: videoElementsRef.current,
+      videoElements: validElements,
     };
-  };
-  console.log(JSON.stringify(buildExportConfig(), null, 2));
+  }, []);
   // Reset editor
-  const resetEditor = () => {
+  const resetEditor = useCallback(() => {
     videoElementsRef.current = [];
     sourceRef.current = null;
     setCurrentTimeState(0);
     setDurationState(0);
-  };
+  }, []);
 
   return (
     <EditorStateContext.Provider
@@ -203,6 +709,49 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         isScrubbing,
         startScrubbing,
         stopScrubbing,
+        setAudioTrim,
+        getAudioTrim,
+        audioUri,
+        setAudioUri,
+        videoNaturalSize,
+        setVideoNaturalSize,
+        isPlaying,
+        setIsPlaying,
+        isTrimming,
+        setIsTrimming,
+        isDraggingHandle,
+        setIsDraggingHandle,
+        activeSegment,
+        setActiveSegment,
+        thumbnails,
+        setThumbnails,
+        isMuted,
+        setIsMuted,
+        videoRef,
+        setVideoRef,
+        audioSegments,
+        setAudioSegments,
+        addAudioSegment,
+        removeAudioSegment,
+        textSegments,
+        setTextSegments,
+        addTextSegment,
+        updateTextSegment,
+        updateTextSegmentStart,
+        updateTextSegmentEnd,
+        removeTextSegment,
+        isTextEditorVisible,
+        setIsTextEditorVisible,
+        editingTextElement,
+        setEditingTextElement,
+        isTextDragging,
+        setIsTextDragging,
+        isTextPinching,
+        setIsTextPinching,
+        voiceoverSegments,
+        setVoiceoverSegments,
+        addVoiceoverSegment,
+        removeVoiceoverSegment,
       }}
     >
       {children}

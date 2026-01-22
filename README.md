@@ -4,14 +4,11 @@ Video Editor tool for react-native(Trim, crop etc., add music, add textoverlay e
 
 ## Installation
 
-
 ```sh
 npm install react-native-video-editor-sdk
 ```
 
-
 ## Usage
-
 
 ```js
 import { multiply } from 'react-native-video-editor-sdk';
@@ -20,7 +17,6 @@ import { multiply } from 'react-native-video-editor-sdk';
 
 const result = multiply(3, 7);
 ```
-
 
 ## Contributing
 

@@ -1,5 +1,6 @@
 // @ts-ignore - External dependency
 import { createThumbnail } from 'react-native-create-thumbnail';
+import { Platform } from 'react-native';
 import type { ThumbnailData } from '../types/timeline';
 import { getTimelineWidth } from './timelineUtils';
 
@@ -7,6 +8,22 @@ const CHUNK_SIZE = 3;
 const MIN_THUMBS = 10;
 const TARGET_THUMBNAIL_WIDTH = 80;
 const SAFE_START_MS = 1000;
+
+const normalizeVideoUri = (uri: string): string => {
+  if (Platform.OS === 'ios') {
+    try {
+      let path = uri.replace(/^file:\/\//, '');
+
+      path = decodeURIComponent(path);
+
+      return `file://${path}`;
+    } catch (error) {
+      console.error('Error normalizing URI:', error);
+      return uri;
+    }
+  }
+  return uri;
+};
 
 export const generateThumbnails = async (
   videoUri: string,
@@ -27,8 +44,12 @@ export const generateThumbnails = async (
       return [];
     }
 
+    // Normalize URI for platform compatibility
+    const normalizedUri = normalizeVideoUri(videoUri);
+
     console.log(
-      `Starting thumbnail generation for ${videoDuration.toFixed(2)}s video`
+      `Starting thumbnail generation for ${videoDuration.toFixed(2)}s video`,
+      Platform.OS === 'ios' ? `\n  Original URI: ${videoUri}\n  Normalized URI: ${normalizedUri}` : ''
     );
 
     // Generate unique cache identifier
@@ -77,7 +98,7 @@ export const generateThumbnails = async (
           }
 
           return createThumbnail({
-            url: videoUri,
+            url: normalizedUri,
             timeStamp: Math.floor(timeStampMs),
             cacheName: `thumb_${mediaUriHash}_${index}_${timeStampMs}`,
           })
@@ -93,9 +114,16 @@ export const generateThumbnails = async (
               throw new Error('Invalid thumbnail path');
             })
             .catch((err: any) => {
-              console.warn(
-                `Failed to generate thumbnail at ${timeStampMs}ms`,
-                err
+              console.error(
+                `❌ [Thumbnails] Failed to generate thumbnail at ${Math.floor(timeStampMs)}ms`,
+                {
+                  error: err?.message || err,
+                  errorCode: err?.code || 'unknown',
+                  platform: Platform.OS,
+                  originalUri: videoUri,
+                  normalizedUri: normalizedUri,
+                  index,
+                }
               );
               return {
                 uri: '',
@@ -162,10 +190,14 @@ export const regenerateThumbnailsForTrim = async (
     return [];
   }
 
+  // Normalize URI for platform compatibility
+  const normalizedUri = normalizeVideoUri(videoUri);
+
   console.log(
     `Regenerating thumbnails from ${startTime.toFixed(
       2
-    )}s for ${duration.toFixed(2)}s`
+    )}s for ${duration.toFixed(2)}s`,
+    Platform.OS === 'ios' ? `\n  Normalized URI: ${normalizedUri}` : ''
   );
 
   try {
@@ -202,7 +234,7 @@ export const regenerateThumbnailsForTrim = async (
           }
 
           return createThumbnail({
-            url: videoUri,
+            url: normalizedUri,
             timeStamp: timeStampMs,
             cacheName: `trim_thumb_${mediaUriHash}_${index}_${timeStampMs}`,
           })
@@ -218,9 +250,16 @@ export const regenerateThumbnailsForTrim = async (
               throw new Error('Invalid thumbnail path');
             })
             .catch((err: any) => {
-              console.warn(
-                `Failed to generate trim thumbnail at ${timeStampMs}ms`,
-                err
+              console.error(
+                `❌ [Trim Thumbnails] Failed at ${timeStampMs}ms`,
+                {
+                  error: err?.message || err,
+                  errorCode: err?.code || 'unknown',
+                  platform: Platform.OS,
+                  originalUri: videoUri,
+                  normalizedUri: normalizedUri,
+                  index,
+                }
               );
               return {
                 uri: '',
@@ -253,7 +292,10 @@ export const regenerateThumbnailsForTrim = async (
       }
 
       if (i + CHUNK_SIZE < numThumbs) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        if (global.gc) {
+          global.gc();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
     return allResults;
