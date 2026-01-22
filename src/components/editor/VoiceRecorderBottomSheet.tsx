@@ -113,10 +113,27 @@ export const VoiceRecorderBottomSheet: React.FC<
 
   useEffect(() => {
     return () => {
-      Sound.stopRecorder();
-      Sound.removeRecordBackListener();
+      // Critical cleanup to prevent memory leaks
+      try {
+        Sound.stopRecorder();
+        Sound.removeRecordBackListener();
+      } catch (e) {
+        console.warn('Cleanup error:', e);
+      }
     };
   }, []);
+
+  // Additional cleanup when recording state changes
+  useEffect(() => {
+    if (!isRecording && !isVisible) {
+      // Clean up listener when not recording and sheet is closed
+      try {
+        Sound.removeRecordBackListener();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+  }, [isRecording, isVisible]);
 
   useEffect(() => {
     if (isRecording) {
@@ -216,7 +233,7 @@ export const VoiceRecorderBottomSheet: React.FC<
       const documentsDir = deviceUtils.isAndroid
         ? RNFS.DocumentDirectoryPath
         : RNFS.CachesDirectoryPath;
-      const targetPath = makeRecordingPath();
+      const targetPath = deviceUtils.isAndroid ? makeRecordingPath() : undefined;
 
       try {
         const exists = await RNFS.exists(documentsDir);
@@ -284,11 +301,14 @@ export const VoiceRecorderBottomSheet: React.FC<
     if (isRecording) {
       await onStopRecord();
       // Automatically trigger Done after stopping
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (recordedAudioUri || recordTime > 0) {
           handleDone();
         }
       }, 100);
+
+      // Store timeout ID for cleanup
+      return () => clearTimeout(timeoutId);
     } else {
       onStartRecord();
     }

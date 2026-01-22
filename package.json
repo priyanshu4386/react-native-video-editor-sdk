@@ -85,8 +85,8 @@
   },
   "peerDependencies": {
     "@react-native-documents/picker": "*",
-    "react": "*",
-    "react-native": "*",
+    "react": ">=18",
+    "react-native": ">=0.72",
     "react-native-create-thumbnail": "*",
     "react-native-fast-image": "*",
     "react-native-fs": "*",

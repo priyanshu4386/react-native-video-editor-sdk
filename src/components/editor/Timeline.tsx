@@ -68,6 +68,7 @@ export const Timeline: React.FC<TimelineProps> = ({
     setIsPlaying,
     setCurrentTime,
     setTrim,
+    getTrim,
     isTrimming,
     setIsTrimming,
     setIsDraggingHandle,
@@ -95,6 +96,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   const isUserScrolling = useRef(false);
   const didScrollRef = useRef(false);
   const isTrimmingRef = useRef(false);
+  const trimHandlesInitializedRef = useRef(false);
 
   useEffect(() => {
     isTrimmingRef.current = isTrimming;
@@ -123,7 +125,30 @@ export const Timeline: React.FC<TimelineProps> = ({
     thumbnails,
     isGenerating,
     generateThumbnails: initThumbnails,
+    resetThumbnails,
   } = useThumbnails(validVideoSource);
+
+  // Cleanup thumbnails and FastImage cache on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      console.log('🧹 Timeline unmounting - clearing thumbnails and cache');
+      resetThumbnails();
+      // Clear FastImage cache for thumbnails
+      try {
+        FastImage.clearMemoryCache();
+      } catch (e) {
+        console.warn('Failed to clear FastImage cache:', e);
+      }
+    };
+  }, [resetThumbnails]);
+
+  // Reset trim handles initialization flag when video source changes
+  useEffect(() => {
+    if (validVideoSource) {
+      console.log('🎬 Timeline: Video source changed, resetting trim initialization flag');
+      trimHandlesInitializedRef.current = false;
+    }
+  }, [validVideoSource]);
 
   useEffect(() => {
     if (duration > 0 && validVideoSource) {
@@ -148,9 +173,11 @@ export const Timeline: React.FC<TimelineProps> = ({
         console.log('🎬 Timeline: Thumbnail generation already in progress...');
       }
 
-      // Initialize trim handles when duration is available
-      if (duration > 0) {
+      // Initialize trim handles only once when duration is first available
+      if (duration > 0 && !trimHandlesInitializedRef.current) {
+        console.log('🎬 Timeline: Initializing trim handles for the first time');
         initializeTrimHandles(duration);
+        trimHandlesInitializedRef.current = true;
       }
     } else {
       if (!validVideoSource) {
@@ -387,6 +414,11 @@ export const Timeline: React.FC<TimelineProps> = ({
   const handleConfirmTrim = () => {
     if (duration > 0) {
       const { startTime, endTime } = getTrimTimes(duration);
+      console.log('🎬 Timeline: Confirming trim', {
+        startTime: startTime.toFixed(2) + 's',
+        endTime: endTime.toFixed(2) + 's',
+        duration: (endTime - startTime).toFixed(2) + 's'
+      });
       setTrim(startTime, endTime);
       setIsTrimming(false);
       setActiveTool(null);
@@ -395,7 +427,22 @@ export const Timeline: React.FC<TimelineProps> = ({
 
   const handleCancelTrim = () => {
     if (duration > 0) {
-      initializeTrimHandles(duration);
+      // Get the saved trim state from context
+      const savedTrim = getTrim();
+
+      // If there's a saved trim, restore it; otherwise reset to full width
+      if (savedTrim.start > 0 || savedTrim.end < 1) {
+        // Restore to saved trim position
+        const timelineWidthValue = getTimelineWidth(duration);
+        trimStart.value = savedTrim.start * timelineWidthValue;
+        trimEnd.value = savedTrim.end * timelineWidthValue;
+        console.log('🎬 Timeline: Restored saved trim position', savedTrim);
+      } else {
+        // No saved trim, reset to full width
+        initializeTrimHandles(duration);
+        console.log('🎬 Timeline: Reset trim to full width');
+      }
+
       setIsTrimming(false);
       setActiveTool(null);
     }
@@ -554,6 +601,19 @@ export const Timeline: React.FC<TimelineProps> = ({
         duration
       );
       runOnJS(scrollToTime)(finalTime, true);
+
+      // Update trim state immediately after handle drag
+      const startTime = pixelsToTime(
+        trimStart.value,
+        trimTimelineWidth.value,
+        duration
+      );
+      const endTime = pixelsToTime(
+        trimEnd.value,
+        trimTimelineWidth.value,
+        duration
+      );
+      runOnJS(setTrim)(startTime, endTime);
     });
 
   const rightHandleGesture = Gesture.Pan()
@@ -591,6 +651,19 @@ export const Timeline: React.FC<TimelineProps> = ({
         duration
       );
       runOnJS(scrollToTime)(finalTime, true);
+
+      // Update trim state immediately after handle drag
+      const startTime = pixelsToTime(
+        trimStart.value,
+        trimTimelineWidth.value,
+        duration
+      );
+      const endTime = pixelsToTime(
+        trimEnd.value,
+        trimTimelineWidth.value,
+        duration
+      );
+      runOnJS(setTrim)(startTime, endTime);
     });
 
   // Animated styles for trim handles

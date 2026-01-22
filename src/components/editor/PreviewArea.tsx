@@ -303,6 +303,7 @@ export const PreviewArea: React.FC<Props> = ({
               setCurrentTime(time);
             }
           }}
+          progressUpdateInterval={100}
           volume={mainVideoVolume}
           muted={isMuted}
         />
