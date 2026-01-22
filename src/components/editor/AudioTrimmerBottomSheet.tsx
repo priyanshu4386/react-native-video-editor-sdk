@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { View, Text, Dimensions, Pressable, Platform } from 'react-native';
+import { View, Text, Dimensions, Pressable, Platform, Image } from 'react-native';
 // @ts-ignore - Peer dependency
 import Video from 'react-native-video';
 // @ts-ignore - Peer dependency
@@ -25,6 +25,8 @@ import {
 import { useEditorState } from '../../context/EditorStateContext';
 import { createAudioTrimmerStyles } from './AudioTrimmerBottomSheetStyles';
 import { deviceUtils } from '../../utils/deviceUtils';
+  // @ts-ignore - Peer dependency
+import { LoopCycleIcon } from '../../assets/icons/index.js';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const clamp = (v: number, min: number, max: number) =>
@@ -404,10 +406,10 @@ export const AudioTrimmerBottomSheet: React.FC<Props> = ({
                 end={{ x: 1, y: 0 }}
                 style={styles.loopIconGradient}
               >
-                <Text style={styles.loopIconText}>⟲</Text>
+                <Image style={styles.loopIconText} source={LoopCycleIcon}/>
               </LinearGradient>
             ) : (
-              <Text style={styles.loopIcon}>⟲</Text>
+              <Image style={styles.loopIconText} source={LoopCycleIcon}/>
             )}
           </Pressable>
         )}

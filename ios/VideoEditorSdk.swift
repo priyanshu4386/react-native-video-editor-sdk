@@ -1718,6 +1718,7 @@ class VideoEditorSdk: NSObject {
       return
     }
 
+    // Add original video audio tracks
     for audioTrack in videoAsset.tracks(withMediaType: .audio) {
       if let compositionAudioTrack = composition.addMutableTrack(
         withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
@@ -1728,10 +1729,7 @@ class VideoEditorSdk: NSObject {
       }
     }
 
-    guard let backgroundAudioTrack = audioAsset.tracks(withMediaType: .audio).first,
-      let compositionBackgroundAudioTrack = composition.addMutableTrack(
-        withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-    else {
+    guard let backgroundAudioTrack = audioAsset.tracks(withMediaType: .audio).first else {
       reject("E_NO_AUDIO_TRACK", "No audio track found in selected audio", nil)
       return
     }
@@ -1741,31 +1739,35 @@ class VideoEditorSdk: NSObject {
     let audioTrimStart = CMTime(seconds: audioOffset / 1000.0, preferredTimescale: 600)
     let videoInsertStart = CMTime(seconds: startTime / 1000.0, preferredTimescale: 600)
 
+    // ✅ FIXED: Create a SINGLE background music track
+    guard let compositionBackgroundAudioTrack = composition.addMutableTrack(
+      withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+    else {
+      reject("E_NO_AUDIO_TRACK", "Could not add audio track to composition", nil)
+      return
+    }
+
     if isLooped && overlayDurationSeconds > 0 {
       print("🔁 [BGM] Looping enabled. Video duration: \(videoDurationSeconds)s, Audio clip duration: \(overlayDurationSeconds)s")
 
       var currentPosition = CMTimeGetSeconds(videoInsertStart)
       var loopCount = 0
-      let requiredLoops = Int(ceil(videoDurationSeconds / overlayDurationSeconds))
+      let audioDurationSeconds = CMTimeGetSeconds(audioAsset.duration) - CMTimeGetSeconds(audioTrimStart)
+      let actualLoopDuration = min(overlayDurationSeconds, audioDurationSeconds)
 
-      while currentPosition < videoDurationSeconds && loopCount < requiredLoops {
-        guard let loopAudioTrack = composition.addMutableTrack(
-          withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-        else{
-          print("⚠️ Could not add audio track for loop \(loopCount)")
-          break
-        }
-
+      // Loop until we cover the entire video duration
+      while currentPosition < videoDurationSeconds {
         let remainingDuration = videoDurationSeconds - currentPosition
-        let currentLoopDuration = min(overlayDurationSeconds, remainingDuration)
+        let currentLoopDuration = min(actualLoopDuration, remainingDuration)
         let loopDurationTime = CMTime(seconds: currentLoopDuration, preferredTimescale: 600)
         let insertAtTime = CMTime(seconds: currentPosition, preferredTimescale: 600)
 
         do {
-          try loopAudioTrack.insertTimeRange(
+          // ✅ FIXED: Insert into the SAME track at different positions
+          try compositionBackgroundAudioTrack.insertTimeRange(
             CMTimeRange(start: audioTrimStart, duration: loopDurationTime),
             of: backgroundAudioTrack,
-            at: insertAtTime)
+            at: insertAtTime)  // This is correct now - inserting into the composition timeline
 
           print("✅ Added audio loop \(loopCount + 1): duration \(currentLoopDuration)s at position \(currentPosition)s")
 
@@ -1773,19 +1775,13 @@ class VideoEditorSdk: NSObject {
           loopCount += 1
         } catch {
           print("❌ Failed to insert audio loop \(loopCount): \(error.localizedDescription)")
-          break
+          reject("E_INSERT_AUDIO_FAILED", "Failed to insert background audio: \(error.localizedDescription)", error)
+          return
         }
       }
       print("🔁 Audio looping complete. Total loops: \(loopCount)")
     } else {
       print("🎵 [BGM] Looping disabled. Playing audio once.")
-
-      guard let compositionBackgroundAudioTrack = composition.addMutableTrack(
-        withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-      else {
-        reject("E_NO_AUDIO_TRACK", "Could not add audio track to composition", nil)
-        return
-      }
 
       let overlayDuration = CMTime(seconds: overlayDurationSeconds, preferredTimescale: 600)
 
