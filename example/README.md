@@ -1,97 +1,170 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Video Editor SDK – Example App
 
-# Getting Started
+This is the **example application** for the `react-native-video-editor-sdk`.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+It demonstrates how to:
 
-## Step 1: Start Metro
+* Integrate the SDK into a React Native app
+* Pick a video from the device
+* Open the built-in video editor UI
+* Enable editing features via boolean flags
+* Receive and preview the exported video
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+This app is intended **for development and testing only**. End users of the SDK do **not** need this example app.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
-```sh
-# Using npm
-npm start
+## Prerequisites
 
-# OR using Yarn
-yarn start
-```
+Before running the example app, make sure you have completed the official React Native environment setup:
 
-## Step 2: Build and run your app
+👉 [https://reactnative.dev/docs/set-up-your-environment](https://reactnative.dev/docs/set-up-your-environment)
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+Required tools:
 
-### Android
+* Node.js (see root `.nvmrc`)
+* Yarn (recommended)
+* Xcode (for iOS)
+* Android Studio (for Android)
 
-```sh
-# Using npm
-npm run android
+---
 
-# OR using Yarn
-yarn android
-```
+## Install Dependencies
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+From the **root of the repository**:
 
 ```sh
-bundle install
+yarn
 ```
 
-Then, and every time you update your native dependencies, run:
+This installs dependencies for both:
+
+* the SDK (root package)
+* the example app (`example/`)
+
+---
+
+## iOS Setup
+
+Navigate to the iOS directory of the example app:
 
 ```sh
-bundle exec pod install
+cd example/ios
+pod install
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Then go back to the root:
 
 ```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+cd ../..
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+---
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+## Running the Example App
 
-## Step 3: Modify your app
+### Start Metro
 
-Now that you have successfully run the app, let's make changes!
+From the root directory:
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+```sh
+yarn example start
+```
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+---
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### Run on iOS
 
-## Congratulations! :tada:
+In a new terminal (from the root directory):
 
-You've successfully run and modified your React Native App. :partying_face:
+```sh
+yarn example ios
+```
 
-### Now what?
+---
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+### Run on Android
 
-# Troubleshooting
+Make sure an emulator or device is connected, then:
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+```sh
+yarn example android
+```
 
-# Learn More
+---
 
-To learn more about React Native, take a look at the following resources:
+## What This Example Demonstrates
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+The example app shows how to use the SDK with **minimal setup**:
+
+* Wrap the app with `GestureHandlerRootView`
+* Render `VideoEditorHost` once at the root
+* Call `openVideoEditor()` with feature flags
+
+### Core Usage Pattern
+
+```ts
+const result = await openVideoEditor({
+  source: videoUri,
+  editTrim: true,
+  editCrop: true,
+  editBGM: true,
+  editTextOverlay: true,
+  editVoiceOver: true,
+});
+```
+
+If editing is successful, the SDK returns the exported video URI, which the example app plays using `react-native-video`.
+
+---
+
+## File Overview
+
+Key files in the example app:
+
+* `App.tsx`
+
+  * Picks a video from the device
+  * Opens the video editor
+  * Displays and plays the exported video
+
+* `VideoEditorHost`
+
+  * Mounted once to host the native editor UI
+
+---
+
+## Notes
+
+* Native code changes **require rebuilding** the app
+* JavaScript/TypeScript changes hot-reload automatically
+* This app uses the local SDK source via Yarn workspaces
+
+---
+
+## Troubleshooting
+
+If you encounter issues:
+
+* Clear Metro cache:
+
+  ```sh
+  npx react-native start --reset-cache
+  ```
+* Reinstall pods:
+
+  ```sh
+  cd example/ios && pod install
+  ```
+* Ensure all peer dependencies listed in the root README are installed
+
+---
+
+## Learn More
+
+* SDK documentation: `../README.md`
+* React Native docs: [https://reactnative.dev](https://reactnative.dev)
+
+---
+
+**This example app is for demonstration and development purposes only.**

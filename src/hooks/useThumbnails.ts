@@ -19,7 +19,6 @@ export const useThumbnails = (videoUri: string) => {
 
     // If video URI changed, reset thumbnails to prevent memory accumulation
     if (currentVideoUriRef.current !== videoUri) {
-      console.log('🧹 Video URI changed, clearing old thumbnails');
       setThumbnails([]);
       hasGeneratedRef.current = false;
       lastValidThumbnailRef.current = null;
@@ -51,22 +50,13 @@ export const useThumbnails = (videoUri: string) => {
       }
 
       if (isGenerating) {
-        console.log('⏳ Thumbnail generation already in progress, skipping...');
         return;
       }
 
       if (hasGeneratedRef.current && thumbnails.length > 0) {
-        console.log(
-          `✅ Thumbnails already generated (${thumbnails.length} thumbnails), skipping...`
-        );
         return;
       }
 
-      console.log(
-        `🚀 Starting thumbnail generation immediately for ${videoDuration.toFixed(
-          2
-        )}s video`
-      );
       setIsGenerating(true);
       hasGeneratedRef.current = true;
 
@@ -80,20 +70,6 @@ export const useThumbnails = (videoUri: string) => {
         // Only set thumbnails if component is still mounted
         if (isMountedRef.current) {
           setThumbnails(results);
-          console.log(
-            `✅ useThumbnails: Successfully generated and set ${results.length} thumbnails`,
-            {
-              total: results.length,
-              successful: results.filter((t) => t.status === 'success').length,
-              failed: results.filter((t) => t.status === 'failed').length,
-              thumbnails: results.slice(0, 3).map((t, i) => ({
-                index: i + 1,
-                hasUri: !!t.uri,
-                width: `${t.width.toFixed(2)}px`,
-                status: t.status,
-              })),
-            }
-          );
         }
       } catch (error) {
         console.error('Error generating thumbnails:', error);

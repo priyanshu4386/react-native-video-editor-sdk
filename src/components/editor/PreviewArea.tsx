@@ -250,10 +250,6 @@ export const PreviewArea: React.FC<Props> = ({
           paused={!isPlaying}
           controls={false}
           onLoad={(e: OnLoadData) => {
-            console.log(
-              '📹 PreviewArea: Video loaded, setting duration:',
-              e.duration
-            );
             setDuration(e.duration);
             if (e.naturalSize) {
               setVideoNaturalSize({

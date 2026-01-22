@@ -110,10 +110,6 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
       try {
         const resolved = Image.resolveAssetSource(src);
         if (resolved && resolved.uri) {
-          console.log(
-            '🎬 VideoEditorSDK: Resolved require() source to URI:',
-            resolved.uri.substring(0, 50) + '...'
-          );
           return resolved.uri;
         }
         console.warn(
@@ -138,12 +134,6 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
     return '';
   };
 
-  useEffect(() => {
-    const moduleName =
-      Platform.OS === 'android' ? 'VideoEditor' : 'VideoEditorSdk';
-    console.log('Native modules', NativeModules?.[moduleName]);
-  }, []);
-
   const sourceUri = getSourceUri(source);
   const { activeTool, setActiveTool } = useEditorContext();
   const [containerHeight, setContainerHeight] = useState(0);
@@ -165,11 +155,6 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
       return;
     }
 
-    console.log('🎬 VideoEditorSDK: Initializing editor', {
-      originalSource: source,
-      sourceType: typeof source,
-      resolvedUri: sourceUri ? sourceUri.substring(0, 50) + '...' : 'empty',
-    });
     initEditor({
       source: sourceUri || source,
       features: {
@@ -182,7 +167,6 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
     });
 
     return () => {
-      console.log('🎬 VideoEditorSDK: Cleaning up editor');
       resetEditor();
     };
   }, [editTrim, source]);
@@ -197,8 +181,6 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
       }
 
       const config = buildExportConfig();
-      console.log('React-native video Editing Props', config);
-      // return
       const exportedUri = await VideoEditorNative.applyEdits(config);
       onCloseEditor({ success: true, exportedUri });
     } catch (e: any) {

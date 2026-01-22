@@ -132,7 +132,6 @@ export const Timeline: React.FC<TimelineProps> = ({
   // Cleanup thumbnails and FastImage cache on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
-      console.log('🧹 Timeline unmounting - clearing thumbnails and cache');
       resetThumbnails();
       // Clear FastImage cache for thumbnails
       try {
@@ -146,46 +145,28 @@ export const Timeline: React.FC<TimelineProps> = ({
   // Reset trim handles initialization flag when video source changes
   useEffect(() => {
     if (validVideoSource) {
-      console.log('🎬 Timeline: Video source changed, resetting trim initialization flag');
       trimHandlesInitializedRef.current = false;
     }
   }, [validVideoSource]);
 
   useEffect(() => {
     if (duration > 0 && validVideoSource) {
-      console.log('🎬 Timeline: Duration available, checking thumbnails...', {
-        duration: `${duration.toFixed(2)}s`,
-        videoSource: validVideoSource.substring(0, 50) + '...',
-        thumbnailsCount: thumbnails.length,
-        isGenerating,
-      });
-
       if (thumbnails.length === 0 && !isGenerating) {
-        console.log(
-          '🎬 Timeline: Starting thumbnail generation immediately for duration:',
-          `${duration.toFixed(2)}s`
-        );
+
         initThumbnails(duration);
       } else if (thumbnails.length > 0) {
-        console.log(
-          `🎬 Timeline: ${thumbnails.length} thumbnails already available`
-        );
       } else if (isGenerating) {
-        console.log('🎬 Timeline: Thumbnail generation already in progress...');
       }
 
       // Initialize trim handles only once when duration is first available
       if (duration > 0 && !trimHandlesInitializedRef.current) {
-        console.log('🎬 Timeline: Initializing trim handles for the first time');
         initializeTrimHandles(duration);
         trimHandlesInitializedRef.current = true;
       }
     } else {
       if (!validVideoSource) {
-        console.log('🎬 Timeline: Waiting for valid video source...');
       }
       if (duration <= 0) {
-        console.log('🎬 Timeline: Waiting for video duration...');
       }
     }
   }, [
@@ -258,20 +239,6 @@ export const Timeline: React.FC<TimelineProps> = ({
       }
     }
   }, [activeSegment, textSegments, duration, timelineWidth]);
-
-  // Log when thumbnails are received
-  useEffect(() => {
-    if (thumbnails.length > 0) {
-      console.log(`🎬 Timeline: Received ${thumbnails.length} thumbnails`, {
-        thumbnails: thumbnails.slice(0, 5).map((t, i) => ({
-          index: i + 1,
-          hasUri: !!t.uri,
-          width: `${t.width.toFixed(2)}px`,
-          status: t.status,
-        })),
-      });
-    }
-  }, [thumbnails]);
 
   // Auto-scroll timeline to follow playhead - always sync with video position
   useEffect(() => {
@@ -457,11 +424,6 @@ export const Timeline: React.FC<TimelineProps> = ({
   const handleConfirmTrim = () => {
     if (duration > 0) {
       const { startTime, endTime } = getTrimTimes(duration);
-      console.log('🎬 Timeline: Confirming trim', {
-        startTime: startTime.toFixed(2) + 's',
-        endTime: endTime.toFixed(2) + 's',
-        duration: (endTime - startTime).toFixed(2) + 's'
-      });
       setTrim(startTime, endTime);
       setIsTrimming(false);
       setActiveTool(null);
@@ -479,11 +441,9 @@ export const Timeline: React.FC<TimelineProps> = ({
         const timelineWidthValue = getTimelineWidth(duration);
         trimStart.value = savedTrim.start * timelineWidthValue;
         trimEnd.value = savedTrim.end * timelineWidthValue;
-        console.log('🎬 Timeline: Restored saved trim position', savedTrim);
       } else {
         // No saved trim, reset to full width
         initializeTrimHandles(duration);
-        console.log('🎬 Timeline: Reset trim to full width');
       }
 
       setIsTrimming(false);

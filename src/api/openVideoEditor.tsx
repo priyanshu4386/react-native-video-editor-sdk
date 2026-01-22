@@ -30,6 +30,5 @@ export const openVideoEditor = (
       options,
       resolve,
     });
-    console.log('OPEN_EDITOR_EVENT emitted');
   });
 };

@@ -2,7 +2,7 @@
 
 A **UI-based, native video editing SDK** for React Native.
 
-This library provides a ready-to-use video editor UI (similar to social media editors) that allows users to trim, crop, add music, text overlays, subtitles, and voice-overs — all powered by native iOS and Android implementations.
+This library provides a ready-to-use video editor UI (similar to social media editors) that allows users to trim, crop, add music, text overlays, and voice-overs — all powered by native iOS and Android implementations.
 
 > **Important:**
 > App developers do **not** need to construct JSON editing configurations.
@@ -17,7 +17,6 @@ This library provides a ready-to-use video editor UI (similar to social media ed
 * Crop / change aspect ratio
 * Add background music (BGM)
 * Add text overlays
-* Add subtitles
 * Add voice-over
 * Automatic audio ducking
 * Native export to device storage
@@ -212,7 +211,7 @@ export default function Example() {
 ## Platform Support
 
 * iOS: ✅ Fully supported
-* Android: ⚠️ Partial / in progress
+* Android: ✅ Fully supported
 
 ---
 
