@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Pressable, ScrollView, Text, Platform } from 'react-native';
 // @ts-ignore - Peer dependency
 import Animated, {
@@ -45,7 +45,7 @@ import { TimelineHeader } from '../timeline/TimelineHeader';
 import { createTimelineStyles } from './TimelineStyles';
 import { Image } from 'react-native';
 // @ts-ignore - Peer dependency
-import { MuteIcon, UnMuteIcon } from '../../assets/icons/index.js';
+import { MuteIcon, UnMuteIcon, TrashIcon } from '../../assets/icons/index.js';
 
 const RNScrollView = Animated.ScrollView;
 const ScrollWrapper = deviceUtils.isIOS
@@ -97,6 +97,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   const didScrollRef = useRef(false);
   const isTrimmingRef = useRef(false);
   const trimHandlesInitializedRef = useRef(false);
+  const wasPlayingBeforeScrub = useRef(false);
 
   useEffect(() => {
     isTrimmingRef.current = isTrimming;
@@ -198,6 +199,7 @@ export const Timeline: React.FC<TimelineProps> = ({
 
   const timelineWidth = getTimelineWidth(duration);
   const scrollX = useSharedValue(0);
+  const isUserScrollingShared = useSharedValue(false);
 
   // Text trim shared values
   const activeTextTrimStart = useSharedValue(0);
@@ -306,25 +308,29 @@ export const Timeline: React.FC<TimelineProps> = ({
     }
   }, [currentTime, duration, timelineWidth, isPlaying]);
 
-  const handleScrollBeginDrag = () => {
+  const handleScrollBeginDrag = useCallback(() => {
     didScrollRef.current = true;
     isUserScrolling.current = true;
+    isUserScrollingShared.value = true;
+    wasPlayingBeforeScrub.current = isPlaying;
     if (isPlaying) setIsPlaying(false);
-  };
+  }, [isPlaying, setIsPlaying]);
 
-  const handleTouchStart = () => {
+  const handleTouchStart = useCallback(() => {
     didScrollRef.current = false;
     isUserScrolling.current = true;
+    isUserScrollingShared.value = true;
     if (isPlaying) setIsPlaying(false);
-  };
+  }, [isPlaying, setIsPlaying]);
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = useCallback(() => {
     if (!didScrollRef.current) {
       isUserScrolling.current = false;
+      isUserScrollingShared.value = false;
     }
-  };
+  }, []);
 
-  const handleScrollEndDrag = (event: any) => {
+  const handleScrollEndDrag = useCallback((event: any) => {
     const { velocity, contentOffset, contentSize, layoutMeasurement } =
       event.nativeEvent;
     const isAtStart = contentOffset.x <= 0;
@@ -333,12 +339,38 @@ export const Timeline: React.FC<TimelineProps> = ({
 
     if (Math.abs(velocity?.x || 0) < 0.2 || isAtStart || isAtEnd) {
       isUserScrolling.current = false;
-    }
-  };
+      isUserScrollingShared.value = false;
 
-  const handleMomentumScrollEnd = () => {
+      // Resume playback if it was playing before scrubbing (no momentum)
+      if (wasPlayingBeforeScrub.current) {
+        setTimeout(() => {
+          setIsPlaying(true);
+          wasPlayingBeforeScrub.current = false;
+        }, 50);
+      }
+    }
+  }, [setIsPlaying]);
+
+  const handleMomentumScrollEnd = useCallback(() => {
     isUserScrolling.current = false;
-  };
+    isUserScrollingShared.value = false;
+
+    // Resume playback if it was playing before scrubbing
+    if (wasPlayingBeforeScrub.current) {
+      setTimeout(() => {
+        setIsPlaying(true);
+        wasPlayingBeforeScrub.current = false;
+      }, 50);
+    }
+  }, [setIsPlaying]);
+
+  // Seek video function - defined early for use in animations
+  const seekVideo = useCallback((time: number) => {
+    setCurrentTime(time);
+    if (videoRef?.current) {
+      videoRef.current.seek(time);
+    }
+  }, [setCurrentTime, videoRef]);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event: any) => {
@@ -349,23 +381,34 @@ export const Timeline: React.FC<TimelineProps> = ({
     },
   });
 
-  // Sync Video Preview when user scrolls the timeline
+  // Sync Video Preview when user scrolls the timeline (scrubbing)
   useAnimatedReaction(
-    () => scrollX.value,
-    (currentScroll: number, previousScroll: number | null) => {
+    () => ({
+      scroll: scrollX.value,
+      isScrolling: isUserScrollingShared.value,
+    }),
+    (
+      current: { scroll: number; isScrolling: boolean },
+      previous: { scroll: number; isScrolling: boolean } | null
+    ) => {
+      'worklet';
       if (
-        isUserScrolling.current &&
-        currentScroll !== previousScroll &&
+        current.isScrolling &&
+        current.scroll !== previous?.scroll &&
         timelineWidth > 0 &&
         duration > 0
       ) {
         // Calculate time based on scroll position
-        const time = (currentScroll / timelineWidth) * duration;
+        // The timeline has padding that centers the playhead, so scrollX directly
+        // represents the timeline position the playhead is pointing to
+        const playheadPosition = current.scroll;
+        const clampedPosition = Math.max(0, Math.min(playheadPosition, timelineWidth));
+        const time = (clampedPosition / timelineWidth) * duration;
         const clampedTime = Math.max(0, Math.min(time, duration));
         runOnJS(seekVideo)(clampedTime);
       }
     },
-    [timelineWidth, duration]
+    [timelineWidth, duration, seekVideo]
   );
 
   const handleTogglePlayback = () => {
@@ -524,13 +567,6 @@ export const Timeline: React.FC<TimelineProps> = ({
     }
   };
 
-  const seekVideo = (time: number) => {
-    setCurrentTime(time);
-    if (videoRef?.current) {
-      videoRef.current.seek(time);
-    }
-  };
-
   const handleAddText = () => {
     // Open text editor for new text
     setEditingTextElement(null);
@@ -547,17 +583,20 @@ export const Timeline: React.FC<TimelineProps> = ({
   const scrollToTime = (time: number, animated: boolean = false) => {
     if (scrollViewRef.current && duration > 0 && timelineWidth > 0) {
       const playheadPosition = (time / duration) * timelineWidth;
-      const centerOffset = (SCREEN_WIDTH - TIMELINE_MARGIN_HORIZONTAL * 2) / 2;
       const visibleWidth = SCREEN_WIDTH - TIMELINE_MARGIN_HORIZONTAL * 2;
+      const centerOffset = visibleWidth / 2;
+      const contentPadding = centerOffset;
 
-      // Calculate scroll position to center the playhead
-      let scrollPosition = 0;
+      // Calculate scroll position
+      // The timeline has padding that centers the playhead, so we adjust accordingly
+      let scrollPosition = playheadPosition - centerOffset + contentPadding;
 
-      if (timelineWidth > visibleWidth) {
-        scrollPosition = playheadPosition - centerOffset;
-        const maxScroll = timelineWidth - visibleWidth;
-        scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
-      }
+      // Clamp scroll position to valid range
+      const maxScroll = Math.max(
+        0,
+        timelineWidth + contentPadding * 2 - visibleWidth
+      );
+      scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
 
       scrollViewRef.current.scrollTo({
         x: scrollPosition,
@@ -888,7 +927,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                     style={styles.deleteButton}
                     onPress={() => handleDeleteSegment('audio', segment.id)}
                   >
-                    <Text style={styles.deleteIcon}>🗑️</Text>
+                    <Image style={styles.deleteIcon} source={TrashIcon} tintColor={'#fff'}/>
                   </PressableWrapper>
                 )}
               </PressableWrapper>
@@ -927,7 +966,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                     style={styles.deleteButton}
                     onPress={() => handleDeleteSegment('audio', segment.id)}
                   >
-                    <Text style={styles.deleteIcon}>🗑️</Text>
+                    <Image style={styles.deleteIcon} source={TrashIcon} tintColor={'#fff'}/>
                   </PressableWrapper>
                 )}
               </PressableWrapper>
@@ -1099,6 +1138,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                   styles.textSegment,
                   segStyle,
                   {
+                    position: 'absolute',
                     backgroundColor: 'rgba(255, 204, 0, 0.2)',
                     borderColor: '#FFCC00',
                     opacity: isTextActive ? 0.3 : 0.8,
@@ -1159,7 +1199,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                   style={styles.deleteButton}
                   onPress={() => handleDeleteSegment('text', segment.id)}
                 >
-                  <Text style={styles.deleteIcon}>🗑️</Text>
+                  <Image style={styles.deleteIcon} source={TrashIcon} tintColor={'#fff'}/>
                 </PressableWrapper>
               </Animated.View>
 
@@ -1273,6 +1313,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                 styles.voiceoverSegment,
                 segmentStyle,
                 {
+                  position: 'absolute',
                   backgroundColor: 'rgba(52, 199, 89, 0.3)', // Green tint
                   borderColor: '#34C759',
                 },
@@ -1291,7 +1332,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                   style={styles.deleteButton}
                   onPress={() => handleDeleteSegment('voiceover', segment.id)}
                 >
-                  <Text style={styles.deleteIcon}>🗑️</Text>
+                  <Image style={styles.deleteIcon} source={TrashIcon} tintColor={'#fff'}/>
                 </PressableWrapper>
               )}
             </PressableWrapper>
@@ -1465,6 +1506,59 @@ export const Timeline: React.FC<TimelineProps> = ({
           showsHorizontalScrollIndicator={false}
           style={styles.tracksScrollView}
           onScroll={scrollHandler}
+          onScrollBeginDrag={() => {
+            didScrollRef.current = true;
+            isUserScrolling.current = true;
+            isUserScrollingShared.value = true;
+            wasPlayingBeforeScrub.current = isPlaying;
+            if (isPlaying) setIsPlaying(false);
+          }}
+          onTouchStart={() => {
+            didScrollRef.current = false;
+            isUserScrolling.current = true;
+            isUserScrollingShared.value = true;
+            wasPlayingBeforeScrub.current = isPlaying;
+            if (isPlaying) setIsPlaying(false);
+          }}
+          onTouchEnd={() => {
+            if (!didScrollRef.current) {
+              // Just a tap, not a scroll
+              isUserScrolling.current = false;
+              isUserScrollingShared.value = false;
+            }
+          }}
+          onScrollEndDrag={(event: any) => {
+            const { velocity, contentOffset, contentSize, layoutMeasurement } =
+              event.nativeEvent;
+            const isAtStart = contentOffset.x <= 0;
+            const isAtEnd =
+              contentOffset.x >= contentSize.width - layoutMeasurement.width;
+
+            if (Math.abs(velocity?.x || 0) < 0.2 || isAtStart || isAtEnd) {
+              isUserScrolling.current = false;
+              isUserScrollingShared.value = false;
+
+              // Resume playback if it was playing before scrubbing (no momentum)
+              if (wasPlayingBeforeScrub.current) {
+                setTimeout(() => {
+                  setIsPlaying(true);
+                  wasPlayingBeforeScrub.current = false;
+                }, 50);
+              }
+            }
+          }}
+          onMomentumScrollEnd={() => {
+            isUserScrolling.current = false;
+            isUserScrollingShared.value = false;
+
+            // Resume playback if it was playing before scrubbing
+            if (wasPlayingBeforeScrub.current) {
+              setTimeout(() => {
+                setIsPlaying(true);
+                wasPlayingBeforeScrub.current = false;
+              }, 50);
+            }
+          }}
           scrollEventThrottle={16}
           bounces={false}
         >

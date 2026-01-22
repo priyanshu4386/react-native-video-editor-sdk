@@ -27,8 +27,7 @@ export default function App() {
         const pickedFile = result[0];
         const videoUri = pickedFile.uri;
 
-        console.log('✅ Video selected:', videoUri);
-        console.log('File details:', pickedFile);
+        console.log('✅ selected video details:', pickedFile);
         setSelectedVideoUri(videoUri);
 
         // Immediately open editor with selected video
@@ -39,7 +38,6 @@ export default function App() {
       if (err?.message === 'User canceled document picker') {
         console.log('User cancelled video picker');
       } else {
-        console.error('Error picking video:', err);
         Alert.alert('Error', 'Failed to pick video from device');
       }
     }
@@ -77,11 +75,9 @@ export default function App() {
         // Open the modal to play the video
         setIsModalVisible(true);
       } else if (!result.success) {
-        console.error('❌ Export failed:', result.error);
         Alert.alert('Export Failed', result.error || 'Unknown error');
       }
     } catch (e) {
-      console.error('Editor error:', e);
       Alert.alert('Error', 'Failed to open video editor');
     }
   };

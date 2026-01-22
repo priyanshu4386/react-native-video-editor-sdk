@@ -32,9 +32,10 @@ const TOOLS: { id: EditorTool; label: string; icon: any }[] = [
 
 type BottomToolBarProps = {
   onToolPress?: () => void;
+  onExport?: () => void;
 };
 
-export const BottomToolBar = ({ onToolPress }: BottomToolBarProps) => {
+export const BottomToolBar = ({ onToolPress, onExport }: BottomToolBarProps) => {
   const { setActiveTool, enabledTools, activeTool } = useEditorContext();
   const {
     setAudioUri,
@@ -126,7 +127,8 @@ export const BottomToolBar = ({ onToolPress }: BottomToolBarProps) => {
         if (isPlaying) setIsPlaying(false);
         setActiveTool('text');
       } else if (tool.id === 'save') {
-        setActiveTool('save');
+        // Trigger export
+        onExport?.();
       } else {
         if (tool.id === 'trim') {
           setActiveSegment({ type: 'trim' });

@@ -150,6 +150,7 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
   const [toolBarHeight, setToolBarHeight] = useState(0);
   const [isTimelineVisible, setIsTimelineVisible] = useState(false);
   const safeMargin = deviceUtils.isSmallIphone() ? 30 : 0;
+  const safeSpaceBottom = deviceUtils.isIOS ? toolBarHeight / 3 : toolBarHeight / 1.5;
 
   // Animation values
   const layoutAnimation = useSharedValue(0);
@@ -188,7 +189,16 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
 
   const handleExport = useCallback(async () => {
     try {
+      // Hide timeline before export
+      if (isTimelineVisible) {
+        setIsTimelineVisible(false);
+        // Give animation time to complete (300ms for smooth transition)
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
       const config = buildExportConfig();
+      console.log('React-native video Editing Props', config);
+      // return
       const exportedUri = await VideoEditorNative.applyEdits(config);
       onCloseEditor({ success: true, exportedUri });
     } catch (e: any) {
@@ -197,7 +207,7 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
         error: e?.message ?? 'Export failed',
       });
     }
-  }, [buildExportConfig, onCloseEditor]);
+  }, [buildExportConfig, onCloseEditor, isTimelineVisible, setIsTimelineVisible]);
 
   // Animation effects
   useEffect(() => {
@@ -271,7 +281,7 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
         } else {
           // Create new text segment
           const newTextSegment: TextSegment = {
-            id: `text-${Date.now()}`,
+            id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             type: 'text',
             text: textData.text || '',
             fontSize: textData.fontSize || FONT_SIZE_MIN,
@@ -338,11 +348,12 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
     };
   });
 
+  const safeMarginBottom = deviceUtils.isIOS ? 5 : -25;
   const bottomValue = useMemo(() => {
     return deviceUtils.isSmallIphone()
       ? 5
       : containerHeight > 0
-      ? containerHeight - PREVIEW_HEIGHT - safeTop - safeBottom + 5
+      ? containerHeight - PREVIEW_HEIGHT - safeTop - safeBottom + safeMarginBottom
       : 0;
   }, [containerHeight]);
 
@@ -530,7 +541,7 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
               bottom:
                 containerHeight -
                 PREVIEW_HEIGHT +
-                toolBarHeight / 2 +
+                safeSpaceBottom  +
                 safeMargin,
             },
           ]}
@@ -556,7 +567,10 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
             setToolBarHeight(e.nativeEvent.layout.height);
           }}
         >
-          <BottomToolBar onToolPress={resetPreviewToNormal} />
+          <BottomToolBar
+            onToolPress={resetPreviewToNormal}
+            onExport={handleExport}
+          />
         </Animated.View>
 
         {/* Bottom Sheets */}
@@ -581,7 +595,6 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
                 clipDuration: trimmedAudio.duration,
                 isLooped: trimmedAudio.isLooped,
               };
-              // Close the trimmer first
               setActiveTool(null);
               // Pause video to ensure clean state
               setIsPlaying(false);
@@ -623,7 +636,7 @@ const VideoEditorSDKContentInner: React.FC<VideoEditorSDKProps> = ({
                   duration
                 );
                 const newVoiceoverSegment: VoiceoverSegment = {
-                  id: `voiceover-${Date.now()}`,
+                  id: `voiceover-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                   type: 'voiceover',
                   start: voiceoverData.start,
                   end: endTime,
@@ -697,7 +710,7 @@ export const VideoEditorSDK: React.FC<VideoEditorSDKProps> = (props) => {
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const TOOLS_SECTION_HEIGHT = 140;
-const TIMELINE_SECTION_HEIGHT = SCREEN_HEIGHT * 0.32;
+const TIMELINE_SECTION_HEIGHT = deviceUtils.isAndroid ? SCREEN_HEIGHT * 0.30 : SCREEN_HEIGHT * 0.32;
 
 const styles = ScaledSheet.create({
   safeArea: {
@@ -721,18 +734,18 @@ const styles = ScaledSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: '10@ms',
   },
   swipeIndicator: {
     position: 'absolute',
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: '10@ms',
   },
   swipeHandle: {
     width: '50@ms',
     height: '4@ms',
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 2,
+    borderRadius: '2@ms',
     marginBottom: '8@ms',
   },
   swipeText: {
@@ -748,10 +761,10 @@ const styles = ScaledSheet.create({
     height: TIMELINE_SECTION_HEIGHT,
     backgroundColor: '#000',
     paddingTop: '10@ms',
-    zIndex: 20,
+    zIndex: '20@ms',
     borderTopLeftRadius: '16@ms',
     borderTopRightRadius: '16@ms',
-    borderTopWidth: 1,
+    borderTopWidth: '1@ms',
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   toolsSection: {
@@ -760,32 +773,32 @@ const styles = ScaledSheet.create({
     right: 0,
     height: TOOLS_SECTION_HEIGHT,
     justifyContent: 'center',
-    zIndex: 20,
+    zIndex: '20@ms',
   },
   deleteZoneContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: '100@ms',
     left: 0,
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 150,
+    zIndex: '150@ms',
   },
   deleteZoneText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: '16@ms',
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: '10@ms',
   },
   deleteZoneCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: '60@ms',
+    height: '60@ms',
+    borderRadius: '30@ms',
     backgroundColor: 'rgba(255, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteTextIcon: {
-    fontSize: 24,
+    fontSize: '24@ms',
   },
 });

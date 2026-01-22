@@ -589,11 +589,13 @@ class VideoProcessingModule(private val reactContext: ReactApplicationContext) :
                             val startTime = element.getDouble("startTime") * 1000
                             val endTime = element.getDouble("endTime") * 1000
                             val tempFileName = generateTempFileName("trim")
-                            Log.d("VideoProcessing", "Applying Trim: ${startTime}ms to ${endTime}ms")
+                            Log.d("VideoProcessing", "✂️ Applying Trim: ${startTime}ms to ${endTime}ms")
+                            Log.d("VideoProcessing", "   Input URI: $currentVideoUri")
 
                             currentVideoUri = suspendCoroutine { cont ->
                                 trimVideoToTemp(currentVideoUri!!, startTime, endTime, tempFileName, targetBitrate, createPromiseCallback(cont))
                             }
+                            Log.d("VideoProcessing", "   Output URI: $currentVideoUri")
                             updateVideoDimensions(currentVideoUri!!)
                         }
 
@@ -604,11 +606,13 @@ class VideoProcessingModule(private val reactContext: ReactApplicationContext) :
                                 continue
                             }
                             val tempFileName = generateTempFileName("crop")
-                            Log.d("VideoProcessing", "Applying Crop: $aspectRatio")
+                            Log.d("VideoProcessing", "✂️ Applying Crop: $aspectRatio")
+                            Log.d("VideoProcessing", "   Input URI: $currentVideoUri")
 
                             currentVideoUri = suspendCoroutine { cont ->
                                 cropVideoToTemp(currentVideoUri!!, aspectRatio, tempFileName, targetBitrate, createPromiseCallback(cont))
                             }
+                            Log.d("VideoProcessing", "   Output URI: $currentVideoUri")
                             updateVideoDimensions(currentVideoUri!!)
                         }
 
@@ -630,13 +634,13 @@ class VideoProcessingModule(private val reactContext: ReactApplicationContext) :
 
                             val startTime = 0.0
                             val endTime = videoDurationMs.toDouble()
-                            // val startTime = element.getDouble("startTime") * 1000
-                            // val endTime = element.getDouble("endTime") * 1000
-                            Log.d("VideoProcessing", "Applying BGM: $musicUri")
+                            Log.d("VideoProcessing", "🎵 Applying BGM: $musicUri")
+                            Log.d("VideoProcessing", "   Input URI: $currentVideoUri")
 
                             currentVideoUri = suspendCoroutine { cont ->
                                 addTrimmedAudioToTemp(currentVideoUri!!, musicUri, startTime, endTime, audioOffset, tempFileName, targetBitrate, isLooped, createPromiseCallback(cont))
                             }
+                            Log.d("VideoProcessing", "   Output URI: $currentVideoUri")
                         }
 
                         "addTextOverlay" -> {
@@ -648,8 +652,10 @@ class VideoProcessingModule(private val reactContext: ReactApplicationContext) :
                             i--
 
                             if (textOverlays.isNotEmpty()) {
-                                Log.d("VideoProcessing", "Applying a batch of ${textOverlays.size} text overlays")
+                                Log.d("VideoProcessing", "📝 Applying a batch of ${textOverlays.size} text overlays")
+                                Log.d("VideoProcessing", "   Input URI: $currentVideoUri")
                                 currentVideoUri = processTextOverlays(currentVideoUri!!, textOverlays, videoWidth, videoHeight, targetBitrate)
+                                Log.d("VideoProcessing", "   Output URI: $currentVideoUri")
                             }
                         }
 
@@ -677,17 +683,27 @@ class VideoProcessingModule(private val reactContext: ReactApplicationContext) :
                             i--
 
                             if (voiceOvers.isNotEmpty()) {
-                                Log.d("VideoProcessing", "Applying a batch of ${voiceOvers.size} voice overs")
+                                Log.d("VideoProcessing", "🎤 Applying a batch of ${voiceOvers.size} voice overs")
+                                Log.d("VideoProcessing", "   Input URI: $currentVideoUri")
                                 currentVideoUri = processVoiceOvers(currentVideoUri!!, voiceOvers, targetBitrate)
+                                Log.d("VideoProcessing", "   Output URI: $currentVideoUri")
                             }
                         }
                     }
                     i++
                 }
 
+                Log.d("VideoProcessing", "🎬 All operations completed")
+                Log.d("VideoProcessing", "   Final URI before export: $currentVideoUri")
+                Log.d("VideoProcessing", "   URI scheme: ${currentVideoUri?.toUri()?.scheme}")
+
+                if (currentVideoUri == null) {
+                    throw IllegalStateException("Current video URI is null after processing")
+                }
+
                 val finalFileName = "QueryLoom_${System.currentTimeMillis()}.mp4"
-                Log.d("VideoProcessing", "Exporting final video: $finalFileName from temp URI: $currentVideoUri")
-                exportVideoFromTemp(currentVideoUri!!, finalFileName, promise)
+                Log.d("VideoProcessing", "📤 Exporting final video: $finalFileName")
+                exportVideoFromTemp(currentVideoUri, finalFileName, promise)
 
             } catch (e: Exception) {
                 Log.e("VideoProcessing", "Processing failed", e)
@@ -1559,24 +1575,67 @@ class VideoProcessingModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun exportVideoFromTemp(tempVideoUriString: String, finalFileName: String, promise: Promise) {
+        Log.d("VideoProcessing", "📤 exportVideoFromTemp called")
+        Log.d("VideoProcessing", "   Temp URI: $tempVideoUriString")
+        Log.d("VideoProcessing", "   Final filename: $finalFileName")
+
         val tempUri = try {
             tempVideoUriString.toUri()
         } catch (e: Exception) {
+            Log.e("VideoProcessing", "❌ Invalid URI: ${e.message}")
             promise.reject("E_INVALID_URI", "Invalid video URI: ${e.message}")
             return
         }
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val tempFile = File(tempUri.path!!)
+                // Handle different URI schemes
+                val tempFile = when (tempUri.scheme) {
+                    "file" -> {
+                        // file:// URIs - extract path
+                        val path = tempUri.path
+                        if (path == null) {
+                            throw IllegalArgumentException("File URI has no path: $tempVideoUriString")
+                        }
+                        File(path)
+                    }
+                    "content" -> {
+                        // content:// URIs - copy to temp file
+                        Log.w("VideoProcessing", "⚠️ Received content:// URI, copying to temp file")
+                        val tempOutputFile = File(getTempDir(), "export_${System.currentTimeMillis()}.mp4")
+                        reactContext.contentResolver.openInputStream(tempUri)?.use { input ->
+                            tempOutputFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        tempOutputFile
+                    }
+                    else -> {
+                        // Try direct path conversion as fallback
+                        val path = tempUri.path
+                        if (path != null) {
+                            File(path)
+                        } else {
+                            throw IllegalArgumentException("Unsupported URI scheme: ${tempUri.scheme}")
+                        }
+                    }
+                }
+
+                Log.d("VideoProcessing", "   Resolved file path: ${tempFile.absolutePath}")
+
                 if (!tempFile.exists()) {
+                    Log.e("VideoProcessing", "❌ File not found at: ${tempFile.absolutePath}")
                     throw IllegalArgumentException("Temporary video file not found at: ${tempFile.absolutePath}")
                 }
+
+                Log.d("VideoProcessing", "✅ Export successful: ${tempFile.absolutePath}")
                 withContext(Dispatchers.Main) {
                     promise.resolve(tempFile.absolutePath)
                 }
 
             } catch (e: Exception) {
+                Log.e("VideoProcessing", "❌ Export failed: ${e.message}")
+                Log.e("VideoProcessing", "   Stack trace: ${e.stackTraceToString()}")
                 withContext(Dispatchers.Main) {
                     promise.reject("E_EXPORT_FAILED", "Export failed: ${e.message}")
                 }

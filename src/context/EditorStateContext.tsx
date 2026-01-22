@@ -188,14 +188,23 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   // Add or replace operation - Moved up for stability
   const upsertOperation = useCallback((element: VideoElement) => {
-    const index = videoElementsRef.current.findIndex(
-      (e) => e.type === element.type
-    );
+    // Types that can have multiple instances
+    const multipleAllowedTypes = ['addTextOverlay', 'addVoiceOver'];
 
-    if (index >= 0) {
-      videoElementsRef.current[index] = element;
-    } else {
+    if (multipleAllowedTypes.includes(element.type)) {
+      // For text overlays and voiceovers, always push (no upsert logic)
       videoElementsRef.current.push(element);
+    } else {
+      // For other types (trim, crop, bgm), use upsert logic
+      const index = videoElementsRef.current.findIndex(
+        (e) => e.type === element.type
+      );
+
+      if (index >= 0) {
+        videoElementsRef.current[index] = element;
+      } else {
+        videoElementsRef.current.push(element);
+      }
     }
   }, []);
 
@@ -215,6 +224,8 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   // Initialize editor
   const initEditor = useCallback(({ source }: InitParams) => {
+    console.log('🎬 Initializing editor with source:', source);
+    console.log('🎬 Source type:', typeof source);
     sourceRef.current = source;
 
     videoElementsRef.current = [
@@ -224,6 +235,7 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         muted: false,
       },
     ];
+    console.log('🎬 Initial videoElements:', videoElementsRef.current);
   }, []);
 
   const trimRef = useRef<{ start: number; end: number }>({
@@ -339,7 +351,7 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
       );
       // Add new text overlay operations
       segments.forEach((segment) => {
-        upsertOperation({
+        videoElementsRef.current.push({
           type: 'addTextOverlay',
           text: segment.text,
           fontSize: getFontSizeForVideo(segment.fontSize),
@@ -356,13 +368,14 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         });
       });
     },
-    [upsertOperation, getFontSizeForVideo]
+    [getFontSizeForVideo]
   );
 
   const addTextSegment = useCallback(
     (segment: TextSegment) => {
+      console.log('📝 Adding text segment:', segment.id, segment.text);
       setTextSegmentsState((prev) => [...prev, segment]);
-      upsertOperation({
+      const operation = {
         type: 'addTextOverlay',
         text: segment.text,
         fontSize: getFontSizeForVideo(segment.fontSize),
@@ -376,9 +389,12 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         endTime: segment.end,
         screenWidth: PREVIEW_WIDTH,
         screenHeight: PREVIEW_HEIGHT,
-      });
+      };
+      console.log('📝 Text operation to add:', operation);
+      // Direct push for multiple text overlays
+      videoElementsRef.current.push(operation);
     },
-    [upsertOperation, getFontSizeForVideo]
+    [getFontSizeForVideo]
   );
 
   const updateTextSegment = useCallback(
@@ -391,9 +407,9 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         videoElementsRef.current = videoElementsRef.current.filter(
           (e) => e.type !== 'addTextOverlay'
         );
-        // Rebuild all text overlay operations
+        // Rebuild all text overlay operations from state
         updated.forEach((segment) => {
-          upsertOperation({
+          videoElementsRef.current.push({
             type: 'addTextOverlay',
             text: segment.text,
             fontSize: getFontSizeForVideo(segment.fontSize),
@@ -412,7 +428,7 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         return updated;
       });
     },
-    [upsertOperation, getFontSizeForVideo]
+    [getFontSizeForVideo]
   );
 
   const updateTextSegmentStart = useCallback(
@@ -425,43 +441,9 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         videoElementsRef.current = videoElementsRef.current.filter(
           (e) => e.type !== 'addTextOverlay'
         );
-        // Rebuild all text overlay operations
+        // Rebuild all text overlay operations from state
         updated.forEach((segment) => {
-          upsertOperation({
-            type: 'addTextOverlay',
-            text: segment.text,
-            fontSize: segment.fontSize,
-            textColor: segment.color,
-            textOverlayColor: segment.backgroundColor,
-            textPosition: {
-              xAxis: segment?.x ?? 0,
-              yAxis: segment?.y ?? 0,
-            },
-            startTime: segment.start,
-            endTime: segment.end,
-            screenWidth: PREVIEW_WIDTH,
-            screenHeight: PREVIEW_HEIGHT,
-          });
-        });
-        return updated;
-      });
-    },
-    [upsertOperation, getFontSizeForVideo]
-  );
-
-  const updateTextSegmentEnd = useCallback(
-    (segmentId: string, end: number) => {
-      setTextSegmentsState((prev) => {
-        const updated = prev.map((seg) =>
-          seg.id === segmentId ? { ...seg, end } : seg
-        );
-        // Remove all existing text overlay operations
-        videoElementsRef.current = videoElementsRef.current.filter(
-          (e) => e.type !== 'addTextOverlay'
-        );
-        // Rebuild all text overlay operations
-        updated.forEach((segment) => {
-          upsertOperation({
+          videoElementsRef.current.push({
             type: 'addTextOverlay',
             text: segment.text,
             fontSize: getFontSizeForVideo(segment.fontSize),
@@ -480,7 +462,41 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         return updated;
       });
     },
-    [upsertOperation, getFontSizeForVideo]
+    [getFontSizeForVideo]
+  );
+
+  const updateTextSegmentEnd = useCallback(
+    (segmentId: string, end: number) => {
+      setTextSegmentsState((prev) => {
+        const updated = prev.map((seg) =>
+          seg.id === segmentId ? { ...seg, end } : seg
+        );
+        // Remove all existing text overlay operations
+        videoElementsRef.current = videoElementsRef.current.filter(
+          (e) => e.type !== 'addTextOverlay'
+        );
+        // Rebuild all text overlay operations from state
+        updated.forEach((segment) => {
+          videoElementsRef.current.push({
+            type: 'addTextOverlay',
+            text: segment.text,
+            fontSize: getFontSizeForVideo(segment.fontSize),
+            textColor: segment.color,
+            textOverlayColor: segment.backgroundColor,
+            textPosition: {
+              xAxis: segment?.x ?? 0,
+              yAxis: segment?.y ?? 0,
+            },
+            startTime: segment.start,
+            endTime: segment.end,
+            screenWidth: PREVIEW_WIDTH,
+            screenHeight: PREVIEW_HEIGHT,
+          });
+        });
+        return updated;
+      });
+    },
+    [getFontSizeForVideo]
   );
 
   const removeTextSegment = useCallback(
@@ -495,7 +511,7 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         newSegments.forEach((segment) => {
           // Validate before adding operation
           if (segment.text && segment.text.trim() !== '') {
-            upsertOperation({
+            videoElementsRef.current.push({
               type: 'addTextOverlay',
               text: segment.text,
               fontSize: getFontSizeForVideo(segment.fontSize),
@@ -547,15 +563,19 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
 
   const addVoiceoverSegment = useCallback(
     (segment: VoiceoverSegment) => {
+      console.log('🎤 Adding voiceover segment:', segment.id);
       setVoiceoverSegmentsState((prev) => [...prev, segment]);
-      upsertOperation({
+      const operation = {
         type: 'addVoiceOver',
         voiceOverUri: segment.uri,
         startTime: segment.start,
         endTime: segment.end,
-      });
+      };
+      console.log('🎤 Voiceover operation to add:', operation);
+      // Direct push for multiple voiceovers
+      videoElementsRef.current.push(operation);
     },
-    [upsertOperation]
+    []
   );
 
   const removeVoiceoverSegment = useCallback(
@@ -570,7 +590,7 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         newSegments.forEach((segment) => {
           // Validate before adding operation
           if (segment.uri && segment.uri.trim() !== '') {
-            upsertOperation({
+            videoElementsRef.current.push({
               type: 'addVoiceOver',
               voiceOverUri: segment.uri,
               startTime: segment.start,
@@ -589,11 +609,15 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
         return prev;
       });
     },
-    [upsertOperation]
+    []
   );
 
   // Build native export JSON
   const buildExportConfig = useCallback(() => {
+    console.log('📦 Building export config...');
+    console.log('📦 Total operations in ref:', videoElementsRef.current.length);
+    console.log('📦 Operations:', JSON.stringify(videoElementsRef.current, null, 2));
+
     // Filter out invalid operations before passing to native
     const validElements = videoElementsRef.current.filter((element) => {
       // Validate audio operations
@@ -652,11 +676,13 @@ export const EditorStateProvider: React.FC<EditorStateProviderProps> = ({
       return true;
     });
 
+    console.log('📦 Valid elements after filtering:', validElements.length);
+    console.log('📦 Final config:', JSON.stringify({ videoElements: validElements }, null, 2));
+
     return {
       videoElements: validElements,
     };
   }, []);
-  console.log('ful response', buildExportConfig().videoElements);
   // Reset editor
   const resetEditor = useCallback(() => {
     videoElementsRef.current = [];
